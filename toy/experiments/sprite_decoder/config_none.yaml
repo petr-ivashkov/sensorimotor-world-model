@@ -1,0 +1,5 @@
+defaults: [sprite_base]
+dataset:
+  control: none          # ControlConfig.NONE -> action_dim 0 (fully uncontrolled)
+output:
+  run_name: none

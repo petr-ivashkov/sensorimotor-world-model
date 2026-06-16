@@ -1,0 +1,6 @@
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: coupled, num_dots: 2}
+output:
+  run_name: 1_coupled_pair

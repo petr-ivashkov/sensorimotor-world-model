@@ -1,0 +1,5 @@
+defaults: [sprite_base]
+dataset:
+  control: x             # ControlConfig.X -> action_dim 1 (x controlled; y, θ uncontrolled)
+output:
+  run_name: x

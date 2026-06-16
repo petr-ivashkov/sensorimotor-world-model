@@ -1,0 +1,14 @@
+# @package _global_
+
+data:
+  dataset:
+    frameskip: 5
+    name: tworoom_train
+    cache_dir: ${oc.env:EXTERNAL_DATA_ROOT,data/external}
+    keys_to_load:
+      - pixels
+      - action
+      - proprio
+    keys_to_cache:
+      - action
+      - proprio

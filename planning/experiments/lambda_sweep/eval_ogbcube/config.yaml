@@ -1,0 +1,37 @@
+defaults:
+  - /eval/base
+  - /eval/env/ogbcube
+  - _self_
+
+hydra:
+  searchpath:
+    - file://${oc.env:REPO_ROOT}/config
+
+runs:
+  - name: lambda_0
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_0
+  - name: lambda_0p1
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_0p1
+  - name: lambda_0p3
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_0p3
+  - name: lambda_1
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_1
+  - name: lambda_3
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_3
+  - name: lambda_10
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_10
+  - name: lambda_30
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_30
+  - name: lambda_100
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_ogbcube/results/lambda_100
+
+sweep:
+  goal_offset_steps:
+    - 25
+  result_suffix: ""
+
+eval:
+  num_eval: 100
+  goal_offset_steps: 25
+  eval_budget: 50
+  save_video: false

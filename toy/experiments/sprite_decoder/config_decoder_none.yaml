@@ -1,0 +1,4 @@
+defaults: [decoder_base]
+encoder_run: none         # freeze results/none/model.pt encoder, decode z_t -> ô_t
+output:
+  run_name: none          # write results/none/decoder.pt

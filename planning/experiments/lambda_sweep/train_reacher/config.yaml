@@ -1,0 +1,31 @@
+defaults:
+  - /train/base
+  - /train/data/reacher
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+hydra:
+  searchpath:
+    - file://${oc.env:REPO_ROOT}/config
+
+# Reacher inverse-loss lambda sweep; run.sh overrides only
+# loss.inverse.weight, subdir, and wandb.config.name.
+
+subdir: lambda_10
+
+artifacts:
+  embedding_subset_size: 4096
+
+validation_monitoring:
+  enabled: true
+
+wandb:
+  config:
+    name: lambda_sweep_train_reacher_lambda_10
+
+loss:
+  sigreg:
+    weight: 0.0
+  inverse:
+    weight: 10.0

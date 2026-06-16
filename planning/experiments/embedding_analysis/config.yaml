@@ -1,0 +1,91 @@
+# Export embeddings for seed-0 final trained models.
+
+output_root: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs
+batch_size: 512
+device: cuda
+overwrite: false
+
+environments:
+  - name: TwoRoom
+    slug: tworoom
+    randomized_train_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/tworoom_train_randomized_25k.h5
+    randomized_eval_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/tworoom_eval_randomized_5k.h5
+    methods:
+      - name: inverse
+        label: inverse / ours
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/tworoom_inverse_lambda_0p1_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/tworoom/inverse
+      - name: sigreg
+        label: sigreg
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/tworoom_sigreg_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/tworoom/sigreg
+      - name: forward_only
+        label: forward-only
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/tworoom_forward_only_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/tworoom/forward_only
+
+  - name: Reacher
+    slug: reacher
+    randomized_train_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/reacher_train_randomized_25k.h5
+    randomized_eval_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/reacher_eval_randomized_5k.h5
+    methods:
+      - name: inverse
+        label: inverse / ours
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/reacher_inverse_lambda_1_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/reacher/inverse
+      - name: sigreg
+        label: sigreg
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/reacher_sigreg_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/reacher/sigreg
+      - name: forward_only
+        label: forward-only
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/reacher_forward_only_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/reacher/forward_only
+
+  - name: Push-T
+    slug: pusht
+    randomized_train_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/pusht_expert_train_randomized_25k.h5
+    randomized_eval_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/pusht_expert_eval_randomized_5k.h5
+    methods:
+      - name: inverse
+        label: inverse / ours
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/pusht_inverse_lambda_30_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/pusht/inverse
+      - name: sigreg
+        label: sigreg
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/pusht_sigreg_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/pusht/sigreg
+      - name: forward_only
+        label: forward-only
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/pusht_forward_only_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/pusht/forward_only
+
+  - name: OGBench-Cube
+    slug: ogbcube
+    randomized_train_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/cube_single_expert_train_randomized_25k.h5
+    randomized_eval_dataset_path: ${oc.env:EXTERNAL_DATA_ROOT,${oc.env:REPO_ROOT}/data/external}/cube_single_expert_eval_randomized_5k.h5
+    methods:
+      - name: inverse
+        label: inverse / ours
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/cube_inverse_lambda_1_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/ogbcube/inverse
+      - name: sigreg
+        label: sigreg
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/cube_sigreg_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/ogbcube/sigreg
+      - name: forward_only
+        label: forward-only
+        seed: 0
+        run_dir: ${oc.env:REPO_ROOT}/experiments/train/results/cube_forward_only_seed0
+        output_dir: ${oc.env:REPO_ROOT}/experiments/embedding_analysis/outputs/ogbcube/forward_only

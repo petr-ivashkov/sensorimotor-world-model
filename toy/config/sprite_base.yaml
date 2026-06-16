@@ -1,0 +1,21 @@
+# Shared defaults for the single-sprite world (experiments/sprite_decoder).
+dataset:
+  world: sprite           # selects SpriteWorldDataset in train.build_world
+  shape: arrow            # datasets.sprite_world.Shape
+  image_size: 64
+  sprite_scale: 7.5
+  supersample: 4
+  max_delta_xy: 8.0
+  max_delta_theta: null
+  train_samples: 250000
+  eval_samples: 1000
+model:
+  latent_dim: 64
+  hidden_dim: 256
+training:
+  seed: 42
+  epochs: 200
+  batch_size: 256
+  lr: 5e-4
+  lambda: 10.0
+  eval_every: 10

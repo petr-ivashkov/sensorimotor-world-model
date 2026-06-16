@@ -1,0 +1,39 @@
+defaults:
+  - /eval/base
+  - /eval/env/tworoom
+  - _self_
+
+hydra:
+  searchpath:
+    - file://${oc.env:REPO_ROOT}/config
+
+runs:
+  - name: lambda_0
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_0
+  - name: lambda_0p1
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_0p1
+  - name: lambda_0p3
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_0p3
+  - name: lambda_1
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_1
+  - name: lambda_3
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_3
+  - name: lambda_10
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_10
+  - name: lambda_30
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_30
+  - name: lambda_100
+    run_dir: ${oc.env:REPO_ROOT}/experiments/lambda_sweep/train_tworoom/results/lambda_100
+
+sweep:
+  goal_offset_steps:
+    - 25
+    - 50
+    - 75
+    - 100
+  result_suffix: _fix_budget
+
+eval:
+  num_eval: 100
+  eval_budget: 150
+  save_video: false

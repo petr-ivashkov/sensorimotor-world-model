@@ -1,0 +1,9 @@
+# Shared defaults for the frozen-encoder decoding probe
+decoder:
+  epochs: 30
+  batch_size: 256
+  lr: 1.0e-3
+  seed: 42
+  eval_every: 5
+  # Foreground-weighted L2: per-pixel weight w = 1 + weight_beta * (1 - obs).
+  weight_beta: 10.0

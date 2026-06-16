@@ -1,0 +1,26 @@
+# @package _global_
+
+seed: 42
+
+world:
+  num_envs: ${eval.num_eval}
+  frame_skip: 1
+
+plan_config:
+  horizon: 5
+  receding_horizon: 5
+  action_block: 5
+
+solver:
+  batch_size: 1
+  num_samples: 300
+  var_scale: 1.0
+  n_steps: 30
+  topk: 30
+  device: cuda
+
+eval:
+  num_eval: 100
+  goal_offset_steps: 25
+  eval_budget: 50
+  img_size: 224

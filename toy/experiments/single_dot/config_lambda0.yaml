@@ -1,0 +1,8 @@
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: independent, num_dots: 1}
+training:
+  lambda: 0.0
+output:
+  run_name: lambda0

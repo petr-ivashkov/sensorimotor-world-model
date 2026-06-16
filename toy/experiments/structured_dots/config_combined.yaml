@@ -1,0 +1,8 @@
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: coupled,      num_dots: 2}
+    - {motion: independent,  num_dots: 2}
+    - {motion: random,       num_dots: 1}
+output:
+  run_name: combined

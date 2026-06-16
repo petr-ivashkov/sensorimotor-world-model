@@ -1,0 +1,6 @@
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: independent, num_dots: 2}
+output:
+  run_name: 2_independent
