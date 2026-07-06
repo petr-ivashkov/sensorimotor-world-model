@@ -1,0 +1,11 @@
+executable = /bin/bash
+arguments = -lc "python experiments/multistep_inverse/aggregate_results.py"
+
+output = condor.aggregate.$(Cluster).$(Process).out
+error  = condor.aggregate.$(Cluster).$(Process).err
+log    = condor.aggregate.$(Cluster).log
+
+request_cpus = 2
+request_memory = 16384
+
+queue 1

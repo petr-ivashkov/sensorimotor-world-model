@@ -1,0 +1,14 @@
+executable = /bin/bash
+arguments = -lc "experiments/multistep_inverse/run_eval.sh"
+
+output = condor.eval.$(Cluster).$(Process).out
+error  = condor.eval.$(Cluster).$(Process).err
+log    = condor.eval.$(Cluster).log
+
+request_cpus = 4
+request_memory = 122880
+request_gpus = 1
+
+requirements = !regexp("^g164([.]|$)", TARGET.Machine)
+
+queue 1
