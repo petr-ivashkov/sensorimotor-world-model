@@ -1,0 +1,10 @@
+defaults: [sprite_base]
+dataset:
+  control: xyt            # ControlConfig.XYT -> action_dim 3 (x, y, θ all controlled)
+  # max_delta_theta stays at the matched rim speed (~61°/step, sprite_base default)
+  # rather than sprite_decoder/config_xyt's ±π: with ±π steps the k-step mean-θ
+  # target already wraps (unidentifiable) at k=2, masking the horizon effect under study.
+training:
+  horizon_k: 4          # inverse head decodes (z_t, z_t+k) -> mean action; k=1 == train.py
+output:
+  run_name: sprite_xyt_k4

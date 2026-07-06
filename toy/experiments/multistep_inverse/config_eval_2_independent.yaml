@@ -1,0 +1,2 @@
+defaults: [goal_base]
+model_runs: [2_independent_k1, 2_independent_k2, 2_independent_k4, 2_independent_k8]

@@ -1,0 +1,9 @@
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: independent, num_dots: 1}
+    - {motion: random,      num_dots: 1}
+training:
+  horizon_k: 1          # inverse head decodes (z_t, z_t+k) -> mean action; k=1 == train.py
+output:
+  run_name: 1_dot_1_random_k1

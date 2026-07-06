@@ -32,4 +32,16 @@ done
 # sprite_decoder — all encoders first, then all decoders
 for c in none x xy xyt; do python train.py --config experiments/sprite_decoder/config_$c.yaml; done
 for c in none x xy xyt; do python train_decoder.py --config experiments/sprite_decoder/config_decoder_$c.yaml; done
+
+# multistep_inverse — horizon-k inverse regularizer + oracle-subgoal goal reaching
+# (see experiments/multistep_inverse/README.md; k=1 reproduces train.py exactly)
+experiments/multistep_inverse/run.sh        # 20 training runs (5 envs × k ∈ {1,2,4,8})
+experiments/multistep_inverse/run_eval.sh   # goal-reaching eval for every run
+python experiments/multistep_inverse/aggregate_results.py
+```
+
+To verify the multistep code without training (CPU, ~2-3 min):
+
+```bash
+python tests/test_multistep_inverse.py
 ```

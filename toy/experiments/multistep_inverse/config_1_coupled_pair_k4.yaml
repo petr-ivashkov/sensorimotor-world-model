@@ -1,0 +1,8 @@
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: coupled, num_dots: 2}
+training:
+  horizon_k: 4          # inverse head decodes (z_t, z_t+k) -> mean action; k=1 == train.py
+output:
+  run_name: 1_coupled_pair_k4

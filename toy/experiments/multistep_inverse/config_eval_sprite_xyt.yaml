@@ -1,0 +1,2 @@
+defaults: [goal_base]
+model_runs: [sprite_xyt_k1, sprite_xyt_k2, sprite_xyt_k4, sprite_xyt_k8]

@@ -426,6 +426,161 @@ class SpriteWorldDataset(Dataset):
 
 
 # ─────────────────────────────────────────────────────────────────
+#  Segment dataset (multistep inverse dynamics)
+# ─────────────────────────────────────────────────────────────────
+
+def _safe_xy_bounds(config: SpriteWorldConfig) -> Tuple[float, float]:
+    """Sprite-centre x/y range covered by training frames.
+
+    ``margin = bounding_radius + ceil(max_delta_xy) + 1``, so one (unclamped)
+    step from the margin box stays within [bounding_radius + 1,
+    image_size - 2 - bounding_radius] — exactly the support of state_tp1 in
+    the transition dataset, with ≥1 px anti-aliasing clearance kept.
+    """
+    lo = float(config.bounding_radius + 1)
+    return lo, float(config.image_size - 1) - lo
+
+
+class SpriteWorldSegmentDataset(SpriteWorldDataset):
+    """PyTorch dataset generating k-step pose-trajectory segments.
+
+    Extends the transition dataset to a horizon ``num_steps`` = k.  Sampling
+    matches ``_sample_transition`` step-for-step: initial pose from the margin
+    box, then one matched-distribution delta per step.  The only addition is an
+    in-canvas acceptance check on (x, y), which is vacuous on the first step
+    (the margin guarantees it), so for ``num_steps=1`` this dataset draws the
+    *same RNG sequence* as SpriteWorldDataset and returns bitwise-identical
+    (obs_t, action, obs_tp1, state_t) fields.
+
+    θ wraps at 2π along the segment; recorded actions are the raw (pre-wrap)
+    deltas of the controlled DOFs, so each action matches its transition.
+
+    Returns
+    -------
+    obs_t      : (3, H, W) float32     — observation at t
+    action     : (action_dim,) float32 — first action a_t (feeds the forward loss)
+    obs_tp1    : (3, H, W) float32     — observation at t+1
+    obs_tpk    : (3, H, W) float32     — observation at t+k
+    action_mean: (action_dim,) float32 — (1/k)·Σ_i a_{t+i} (multistep inverse target)
+    state_t    : (3,) float32          — pose (x, y, θ) at t
+    """
+
+    _MAX_REJECTION_ATTEMPTS: int = 1000
+
+    def __init__(
+        self,
+        config: Optional[SpriteWorldConfig] = None,
+        num_samples: int = 10_000,
+        seed: int = 0,
+        num_steps: int = 1,
+    ):
+        super().__init__(config=config, num_samples=num_samples, seed=seed)
+        if num_steps < 1:
+            raise ValueError(f"num_steps must be >= 1, got {num_steps}")
+        self.num_steps = num_steps
+
+    def sample_segment(
+        self, rng: np.random.Generator
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Sample one k-step segment.
+
+        Returns
+        -------
+        states  : (num_steps + 1, 3) float64        — poses s_t ... s_{t+k}
+        actions : (num_steps, action_dim) float32   — actions a_t ... a_{t+k-1}
+        """
+        cfg = self.config
+        s_lo, s_hi = _safe_xy_bounds(cfg)
+
+        states = [self._sample_initial_state(rng)]
+        actions: List[np.ndarray] = []
+
+        for _ in range(self.num_steps):
+            state = states[-1]
+            for _ in range(self._MAX_REJECTION_ATTEMPTS):
+                delta = self._sample_delta(rng)
+                new_state = state + delta
+                new_state[2] = new_state[2] % (2.0 * np.pi)   # wrap θ
+                # Vacuous on the first step (margin), so num_steps=1 draws
+                # exactly one delta, like _sample_transition.
+                if s_lo <= new_state[0] <= s_hi and s_lo <= new_state[1] <= s_hi:
+                    break
+            else:
+                raise RuntimeError(
+                    f"Could not keep the sprite in canvas after "
+                    f"{self._MAX_REJECTION_ATTEMPTS} attempts at one segment "
+                    f"step.  Reduce sprite_scale or max_delta_xy."
+                )
+
+            states.append(new_state)
+            actions.append(delta[cfg.control_mask].astype(np.float32))
+
+        return np.stack(states), np.stack(actions)
+
+    def __getitem__(self, idx: int):
+        rng = np.random.default_rng(self.seed + idx)
+        states, actions = self.sample_segment(rng)
+
+        obs_t   = render_sprite(states[0], self.config)
+        obs_tp1 = render_sprite(states[1], self.config)
+        obs_tpk = obs_tp1 if self.num_steps == 1 else render_sprite(
+            states[-1], self.config
+        )
+
+        return (
+            torch.from_numpy(obs_t),
+            torch.from_numpy(actions[0]),
+            torch.from_numpy(obs_tp1),
+            torch.from_numpy(obs_tpk),
+            torch.from_numpy(actions.mean(axis=0)),
+            torch.from_numpy(states[0].astype(np.float32)),
+        )
+
+
+# ─────────────────────────────────────────────────────────────────
+#  Closed-loop stepping (goal-reaching evaluation)
+# ─────────────────────────────────────────────────────────────────
+
+def step_pose(
+    config: SpriteWorldConfig,
+    state: np.ndarray,              # (3,) float — current pose (x, y, θ)
+    action: np.ndarray,             # (action_dim,) float — controlled DOF deltas
+    rng: np.random.Generator,       # drives uncontrolled DOFs (training dynamics)
+) -> np.ndarray:
+    """Advance the sprite one step under a *continuous* commanded action.
+
+    Execution counterpart of the data-generating dynamics, used by the
+    goal-reaching evaluation.  Controlled DOFs take their deltas from
+    ``action``, clipped to the per-DOF ±delta_scale (the action-space limit);
+    uncontrolled DOFs keep moving with the matched training distribution.
+    x and y are then clamped to the canvas bounds covered by training frames
+    and θ wraps at 2π.
+
+    Returns the new (3,) float64 pose.
+    """
+    if action.shape != (config.action_dim,):
+        raise ValueError(
+            f"action has shape {action.shape}, expected ({config.action_dim},)"
+        )
+    mask = config.control_mask
+    scale = config.delta_scale
+    delta = np.zeros(3, dtype=np.float64)
+    delta[mask] = np.clip(
+        np.asarray(action, dtype=np.float64), -scale[mask], scale[mask]
+    )
+    n_unc = int((~mask).sum())
+    if n_unc:
+        delta[~mask] = rng.uniform(-1.0, 1.0, size=n_unc) * scale[~mask]
+
+    s_lo, s_hi = _safe_xy_bounds(config)
+    new_state = np.asarray(state, dtype=np.float64) + delta
+    new_state[0] = np.clip(new_state[0], s_lo, s_hi)
+    new_state[1] = np.clip(new_state[1], s_lo, s_hi)
+    new_state[2] = new_state[2] % (2.0 * np.pi)
+    return new_state
+
+
+# ─────────────────────────────────────────────────────────────────
 #  Trajectory generation
 # ─────────────────────────────────────────────────────────────────
 

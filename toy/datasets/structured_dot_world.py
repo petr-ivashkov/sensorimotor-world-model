@@ -556,6 +556,237 @@ class StructuredDotWorldDataset(Dataset):
 
 
 # ─────────────────────────────────────────────────────────────────
+#  Segment dataset (multistep inverse dynamics)
+# ─────────────────────────────────────────────────────────────────
+
+def _canvas_bounds(config: StructuredDotWorldConfig) -> Tuple[int, int]:
+    """Positions where a dot is still fully rendered: [dot_radius, size-1-dot_radius].
+
+    This is exactly the support of ``positions_tp1`` in the transition dataset
+    (initial positions live in the margin box, one max displacement away).
+    """
+    return config.dot_radius, config.image_size - 1 - config.dot_radius
+
+
+class StructuredDotWorldSegmentDataset(StructuredDotWorldDataset):
+    """PyTorch dataset generating k-step trajectory segments.
+
+    Extends the transition dataset to a horizon ``num_steps`` = k: a segment
+    (s_t, a_t, s_{t+1}, a_{t+1}, ..., s_{t+k}) is sampled and exposed through
+    the frames needed by the multistep inverse objective.
+
+    Sampling matches ``_sample_transition`` step-for-step: initial positions in
+    the margin box, then per step a rejection loop over group displacements.
+    The only addition is an in-canvas acceptance check, which is vacuous on the
+    first step (the margin guarantees it), so for ``num_steps=1`` this dataset
+    draws the *same RNG sequence* as StructuredDotWorldDataset and returns
+    bitwise-identical (obs_t, action, obs_tp1, positions_t) fields.
+
+    Returns
+    -------
+    obs_t      : (3, H, W) float32   — observation at time t
+    action     : (action_dim,) float32 — first action a_t (feeds the forward loss)
+    obs_tp1    : (3, H, W) float32   — observation at time t+1
+    obs_tpk    : (3, H, W) float32   — observation at time t+k
+    action_mean: (action_dim,) float32 — (1/k)·Σ_i a_{t+i} (multistep inverse target)
+    positions_t: (num_dots * 2,) float32 — flattened (x, y) positions at t
+    """
+
+    def __init__(
+        self,
+        config: Optional[StructuredDotWorldConfig] = None,
+        num_samples: int = 10_000,
+        seed: int = 0,
+        num_steps: int = 1,
+    ):
+        super().__init__(config=config, num_samples=num_samples, seed=seed)
+        if num_steps < 1:
+            raise ValueError(f"num_steps must be >= 1, got {num_steps}")
+        self.num_steps = num_steps
+
+    def sample_segment(
+        self, rng: np.random.Generator
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Sample one k-step segment.
+
+        Returns
+        -------
+        positions : (num_steps + 1, num_dots, 2) int — states s_t ... s_{t+k}
+        actions   : (num_steps, action_dim) float32  — actions a_t ... a_{t+k-1}
+        """
+        cfg = self.config
+        lo = cfg.margin
+        hi = cfg.image_size - 1 - cfg.margin
+        if lo >= hi:
+            raise RuntimeError(
+                f"Margin ({cfg.margin}) is too large for canvas size "
+                f"({cfg.image_size}).  Reduce dot_radius or max_displacement."
+            )
+        c_lo, c_hi = _canvas_bounds(cfg)
+
+        positions = [self._sample_initial_positions(rng, lo, hi)]
+        actions: List[np.ndarray] = []
+
+        for _ in range(self.num_steps):
+            pos = positions[-1]
+            for _ in range(self._MAX_REJECTION_ATTEMPTS):
+                displacements = np.zeros((cfg.num_dots, 2), dtype=np.int32)
+                action_parts: List[np.ndarray] = []
+
+                # Same per-group draws, in the same order, as _sample_transition.
+                for group, (start, end) in zip(cfg.groups, self._group_ranges):
+                    md = group.max_displacement
+
+                    if group.motion_type is MotionType.INDEPENDENT:
+                        disp = rng.integers(-md, md, size=(group.num_dots, 2), endpoint=True)
+                        displacements[start:end] = disp
+                        action_parts.append(disp.reshape(-1).astype(np.float32))
+
+                    elif group.motion_type is MotionType.STATIC:
+                        pass  # zero displacement, no action entry
+
+                    elif group.motion_type is MotionType.RANDOM:
+                        disp = rng.integers(-md, md, size=(group.num_dots, 2), endpoint=True)
+                        displacements[start:end] = disp
+                        # no action entry – uncontrolled
+
+                    elif group.motion_type is MotionType.COUPLED:
+                        pair_disps = rng.integers(
+                            -md, md, size=(group.num_pairs, 2), endpoint=True
+                        )
+                        for p_idx in range(group.num_pairs):
+                            displacements[start + 2 * p_idx]     = pair_disps[p_idx]
+                            displacements[start + 2 * p_idx + 1] = pair_disps[p_idx]
+                        action_parts.append(pair_disps.reshape(-1).astype(np.float32))
+
+                new_pos = pos + displacements
+
+                # Acceptance = transition-dataset rule + in-canvas.  On the first
+                # step in-canvas always holds (margin), so num_steps=1 accepts and
+                # rejects exactly like _sample_transition.
+                overlap_ok = (
+                    cfg.allow_overlap or cfg.num_dots == 1
+                    or not self._has_overlap(new_pos)
+                )
+                in_canvas = bool(
+                    (new_pos >= c_lo).all() and (new_pos <= c_hi).all()
+                )
+                if overlap_ok and in_canvas:
+                    break
+            else:
+                raise RuntimeError(
+                    f"Could not find valid displacements for {cfg.num_dots} dots "
+                    f"after {self._MAX_REJECTION_ATTEMPTS} attempts at one segment "
+                    f"step.  Try fewer dots, smaller radius, or larger canvas."
+                )
+
+            positions.append(new_pos)
+            actions.append(
+                np.concatenate(action_parts) if action_parts
+                else np.zeros(0, dtype=np.float32)
+            )
+
+        return np.stack(positions), np.stack(actions)
+
+    def __getitem__(self, idx: int):
+        rng = np.random.default_rng(self.seed + idx)
+        positions, actions = self.sample_segment(rng)
+
+        obs_t   = render_dots(positions[0], self._color_indices, self.config)
+        obs_tp1 = render_dots(positions[1], self._color_indices, self.config)
+        obs_tpk = obs_tp1 if self.num_steps == 1 else render_dots(
+            positions[-1], self._color_indices, self.config
+        )
+
+        return (
+            torch.from_numpy(obs_t),
+            torch.from_numpy(actions[0]),
+            torch.from_numpy(obs_tp1),
+            torch.from_numpy(obs_tpk),
+            torch.from_numpy(actions.mean(axis=0)),
+            torch.from_numpy(positions[0].reshape(-1).astype(np.float32)),
+        )
+
+
+# ─────────────────────────────────────────────────────────────────
+#  Closed-loop stepping (goal-reaching evaluation)
+# ─────────────────────────────────────────────────────────────────
+
+def step_positions(
+    config: StructuredDotWorldConfig,
+    positions: np.ndarray,          # (num_dots, 2) float — current positions
+    action: np.ndarray,             # (action_dim,) float — controllable displacements
+    rng: np.random.Generator,       # drives RANDOM groups (training dynamics)
+) -> np.ndarray:
+    """Advance the world one step under a *continuous* commanded action.
+
+    Execution counterpart of the (integer) data-generating dynamics, used by
+    the goal-reaching evaluation: decoded actions are floats, so positions are
+    kept continuous and only rendering quantizes (render_dots casts to int).
+    Per group:
+
+      INDEPENDENT / COUPLED — take their (dx, dy) from ``action``, clipped to
+        the group's ±max_displacement (the action-space limit); coupled pairs
+        share one clamped displacement so the pair never tears apart.
+      RANDOM — draw integer displacements exactly like the training data.
+      STATIC — never move.
+
+    Displacements are then clipped so every dot stays inside the canvas bounds
+    [dot_radius, image_size-1-dot_radius] (same support as training frames).
+
+    Returns the new (num_dots, 2) float64 positions.
+    """
+    if action.shape != (config.action_dim,):
+        raise ValueError(
+            f"action has shape {action.shape}, expected ({config.action_dim},)"
+        )
+    c_lo, c_hi = _canvas_bounds(config)
+    pos = np.asarray(positions, dtype=np.float64)
+    displacements = np.zeros((config.num_dots, 2), dtype=np.float64)
+
+    a_idx = 0
+    for group, (start, end) in zip(config.groups, config.group_ranges()):
+        md = group.max_displacement
+
+        if group.motion_type is MotionType.INDEPENDENT:
+            n = group.num_dots
+            disp = np.asarray(
+                action[a_idx:a_idx + 2 * n], dtype=np.float64
+            ).reshape(n, 2)
+            a_idx += 2 * n
+            disp = np.clip(disp, -md, md)
+            displacements[start:end] = np.clip(
+                disp, c_lo - pos[start:end], c_hi - pos[start:end]
+            )
+
+        elif group.motion_type is MotionType.STATIC:
+            pass
+
+        elif group.motion_type is MotionType.RANDOM:
+            disp = rng.integers(-md, md, size=(group.num_dots, 2), endpoint=True)
+            displacements[start:end] = np.clip(
+                disp, c_lo - pos[start:end], c_hi - pos[start:end]
+            )
+
+        elif group.motion_type is MotionType.COUPLED:
+            for p_idx in range(group.num_pairs):
+                a = start + 2 * p_idx
+                b = a + 1
+                d = np.clip(
+                    np.asarray(action[a_idx:a_idx + 2], dtype=np.float64), -md, md
+                )
+                a_idx += 2
+                # Clamp the shared displacement so BOTH dots stay in bounds.
+                low  = c_lo - np.minimum(pos[a], pos[b])
+                high = c_hi - np.maximum(pos[a], pos[b])
+                d = np.clip(d, low, high)
+                displacements[a] = d
+                displacements[b] = d
+
+    return pos + displacements
+
+
+# ─────────────────────────────────────────────────────────────────
 #  Trajectory generation
 # ─────────────────────────────────────────────────────────────────
 
