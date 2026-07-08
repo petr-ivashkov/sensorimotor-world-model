@@ -1,5 +1,5 @@
 executable = /bin/bash
-arguments = -lc "python experiments/multistep_inverse/aggregate_results.py"
+arguments = run_aggregate_condor.sh
 
 output = condor.aggregate.$(Cluster).$(Process).out
 error  = condor.aggregate.$(Cluster).$(Process).err

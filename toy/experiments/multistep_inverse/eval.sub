@@ -1,5 +1,5 @@
-executable = /bin/bash
-arguments = -lc "experiments/multistep_inverse/run_eval.sh"
+executable = run_eval.sh
+arguments =
 
 output = condor.eval.$(Cluster).$(Process).out
 error  = condor.eval.$(Cluster).$(Process).err

@@ -1,9 +1,9 @@
-executable = /bin/bash
-arguments = -lc "experiments/multistep_inverse/run.sh"
+executable = run.sh
+arguments =
 
-output = condor.train.$(Cluster).$(Process).out
-error  = condor.train.$(Cluster).$(Process).err
-log    = condor.train.$(Cluster).log
+output = condor.$(Cluster).$(Process).out
+error  = condor.$(Cluster).$(Process).err
+log    = condor.$(Cluster).log
 
 request_cpus = 4
 request_memory = 122880
