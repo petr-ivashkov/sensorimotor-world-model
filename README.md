@@ -43,12 +43,9 @@ Two self-contained subprojects share the method but target different settings:
 A single environment at the repo root covers both subprojects:
 
 ```bash
-uv sync                      # creates ./.venv (Python ≥ 3.13)
+uv sync                      # creates ./.venv (Python 3.12)
 source .venv/bin/activate
 ```
-
-> On macOS/arm64 the `toy/` half installs and runs as-is; the `planning/` half pulls
-> simulator dependencies that build only on Linux + CUDA (where those experiments run).
 
 ## Instructions
 

@@ -9,7 +9,7 @@ anti-collapse signal.
 The environment is defined once at the repo root (see the top-level [`README.md`](../README.md)):
 
 ```bash
-uv sync                 # from the repo root; creates ../.venv (Python ≥ 3.13)
+uv sync                 # from the repo root; creates ../.venv (Python 3.12)
 source ../.venv/bin/activate
 ```
 

@@ -7,8 +7,7 @@ REPO_ROOT="$(cd "$EXPERIMENT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 source "$REPO_ROOT/../.venv/bin/activate"
 
-# One eval config as $1 (e.g. config_eval_single_dot.yaml), or every
-# config_eval_<env>.yaml sequentially when omitted.
+# One eval config as $1 (e.g. config_eval_single_dot.yaml), or all if omitted.
 if [[ $# -ge 1 ]]; then
     python -u "$REPO_ROOT/eval_goal_reaching.py" --config "$EXPERIMENT_DIR/$1" "${@:2}"
 else

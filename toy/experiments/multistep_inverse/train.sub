@@ -1,14 +1,14 @@
 executable = run.sh
-arguments =
+arguments  = $(cfg)
 
 output = condor.$(Cluster).$(Process).out
 error  = condor.$(Cluster).$(Process).err
 log    = condor.$(Cluster).log
 
-request_cpus = 4
+request_cpus   = 4
 request_memory = 122880
-request_gpus = 1
+request_gpus   = 1
 
 requirements = !regexp("^g164([.]|$)", TARGET.Machine)
 
-queue 1
+queue cfg matching files config_*_k*.yaml

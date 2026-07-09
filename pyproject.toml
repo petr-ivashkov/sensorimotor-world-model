@@ -2,7 +2,7 @@
 name = "sensorimotor-world-model"
 version = "0.1.0"
 description = "Sensorimotor world models with a joint forward + inverse-dynamics objective"
-requires-python = ">=3.13"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     # toy/ — dot-world / sprite experiments (CPU-friendly)
     "torch>=2.2",
