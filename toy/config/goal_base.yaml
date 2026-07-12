@@ -3,9 +3,10 @@ eval:
   episodes: 100
   path_steps: 16              # length T of the ground-truth episode
   subgoal_spacings: [1, 2, 4, 8, 16]
+  execution: [replanning, open_loop]
   success_threshold: 3.0      # px; all controllable dots / sprite centre within
   theta_threshold: 0.3        # rad; sprite θ (only when θ is controlled)
-  budget_factor: 3.0          # per-subgoal budget = ceil(factor·max(spacing, horizon_k)) + slack
+  budget_factor: 3.0          # replanning budget per subgoal = ceil(factor·spacing) + slack
   budget_slack: 2
   seed: 123
   save_traces: true

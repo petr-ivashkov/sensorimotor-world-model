@@ -1,2 +1,2 @@
 defaults: [goal_base]
-model_runs: [single_dot_k1, single_dot_k2, single_dot_k4, single_dot_k8]
+model_runs: [single_dot_kmax1, single_dot_kmax2, single_dot_kmax4, single_dot_kmax8]

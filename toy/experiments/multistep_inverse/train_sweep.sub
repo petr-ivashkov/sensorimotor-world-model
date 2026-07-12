@@ -1,0 +1,32 @@
+# Stage 2 — horizon sweep (k_max in {2,4,8}), 15 GPU jobs; submit after
+# train_ref.sub looks sane:  condor_submit_bid 100 train_sweep.sub
+executable = run.sh
+arguments  = $(cfg)
+
+output = condor.$(Cluster).$(Process).out
+error  = condor.$(Cluster).$(Process).err
+log    = condor.$(Cluster).log
+
+request_cpus   = 4
+request_memory = 122880
+request_gpus   = 1
+
+requirements = !regexp("^g164([.]|$)", TARGET.Machine)
+
+queue cfg from (
+  config_single_dot_kmax2.yaml
+  config_single_dot_kmax4.yaml
+  config_single_dot_kmax8.yaml
+  config_2_independent_kmax2.yaml
+  config_2_independent_kmax4.yaml
+  config_2_independent_kmax8.yaml
+  config_1_coupled_pair_kmax2.yaml
+  config_1_coupled_pair_kmax4.yaml
+  config_1_coupled_pair_kmax8.yaml
+  config_1_dot_1_random_kmax2.yaml
+  config_1_dot_1_random_kmax4.yaml
+  config_1_dot_1_random_kmax8.yaml
+  config_sprite_xyt_kmax2.yaml
+  config_sprite_xyt_kmax4.yaml
+  config_sprite_xyt_kmax8.yaml
+)

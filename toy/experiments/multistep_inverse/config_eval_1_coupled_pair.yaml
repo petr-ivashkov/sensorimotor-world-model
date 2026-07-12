@@ -1,2 +1,2 @@
 defaults: [goal_base]
-model_runs: [1_coupled_pair_k1, 1_coupled_pair_k2, 1_coupled_pair_k4, 1_coupled_pair_k8]
+model_runs: [1_coupled_pair_kmax1, 1_coupled_pair_kmax2, 1_coupled_pair_kmax4, 1_coupled_pair_kmax8]

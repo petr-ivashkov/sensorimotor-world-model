@@ -442,27 +442,32 @@ def _safe_xy_bounds(config: SpriteWorldConfig) -> Tuple[float, float]:
 
 
 class SpriteWorldSegmentDataset(SpriteWorldDataset):
-    """PyTorch dataset generating k-step pose-trajectory segments.
+    """PyTorch dataset generating k-step pose segments with random k.
 
-    Extends the transition dataset to a horizon ``num_steps`` = k.  Sampling
-    matches ``_sample_transition`` step-for-step: initial pose from the margin
-    box, then one matched-distribution delta per step.  The only addition is an
-    in-canvas acceptance check on (x, y), which is vacuous on the first step
-    (the margin guarantees it), so for ``num_steps=1`` this dataset draws the
-    *same RNG sequence* as SpriteWorldDataset and returns bitwise-identical
-    (obs_t, action, obs_tp1, state_t) fields.
+    Multi-step inverse construction of Lamb et al. (arXiv 2207.08229): per
+    example a horizon k is sampled uniformly from {k_min .. k_max}, a k-step
+    segment is rolled out, and the *first* action a_t is the inverse target
+    for the endpoint pair (o_t, o_{t+k}).
+
+    Segment sampling matches ``_sample_transition`` step-for-step: initial
+    pose from the margin box, then one matched-distribution delta per step.
+    The only addition is an in-canvas acceptance check on (x, y), which is
+    vacuous on the first step (the margin guarantees it). When
+    ``k_min == k_max`` no RNG draw is spent on k, so for ``k_min == k_max == 1``
+    this dataset draws the *same RNG sequence* as SpriteWorldDataset and
+    returns bitwise-identical (obs_t, action, obs_tp1, state_t) fields.
 
     θ wraps at 2π along the segment; recorded actions are the raw (pre-wrap)
     deltas of the controlled DOFs, so each action matches its transition.
 
     Returns
     -------
-    obs_t      : (3, H, W) float32     — observation at t
-    action     : (action_dim,) float32 — first action a_t (feeds the forward loss)
-    obs_tp1    : (3, H, W) float32     — observation at t+1
-    obs_tpk    : (3, H, W) float32     — observation at t+k
-    action_mean: (action_dim,) float32 — (1/k)·Σ_i a_{t+i} (multistep inverse target)
-    state_t    : (3,) float32          — pose (x, y, θ) at t
+    obs_t   : (3, H, W) float32     — observation at t
+    action  : (action_dim,) float32 — first action a_t (forward + inverse target)
+    obs_tp1 : (3, H, W) float32     — observation at t+1
+    obs_tpk : (3, H, W) float32     — observation at t+k
+    k       : () int64              — this example's horizon
+    state_t : (3,) float32          — pose (x, y, θ) at t
     """
 
     _MAX_REJECTION_ATTEMPTS: int = 1000
@@ -472,17 +477,19 @@ class SpriteWorldSegmentDataset(SpriteWorldDataset):
         config: Optional[SpriteWorldConfig] = None,
         num_samples: int = 10_000,
         seed: int = 0,
-        num_steps: int = 1,
+        k_min: int = 1,
+        k_max: int = 1,
     ):
         super().__init__(config=config, num_samples=num_samples, seed=seed)
-        if num_steps < 1:
-            raise ValueError(f"num_steps must be >= 1, got {num_steps}")
-        self.num_steps = num_steps
+        if not 1 <= k_min <= k_max:
+            raise ValueError(f"Need 1 <= k_min <= k_max, got ({k_min}, {k_max})")
+        self.k_min = k_min
+        self.k_max = k_max
 
     def sample_segment(
-        self, rng: np.random.Generator
+        self, rng: np.random.Generator, num_steps: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Sample one k-step segment.
+        """Sample one ``num_steps``-step segment.
 
         Returns
         -------
@@ -495,14 +502,14 @@ class SpriteWorldSegmentDataset(SpriteWorldDataset):
         states = [self._sample_initial_state(rng)]
         actions: List[np.ndarray] = []
 
-        for _ in range(self.num_steps):
+        for _ in range(num_steps):
             state = states[-1]
             for _ in range(self._MAX_REJECTION_ATTEMPTS):
                 delta = self._sample_delta(rng)
                 new_state = state + delta
                 new_state[2] = new_state[2] % (2.0 * np.pi)   # wrap θ
-                # Vacuous on the first step (margin), so num_steps=1 draws
-                # exactly one delta, like _sample_transition.
+                # Vacuous on the first step (margin), so a 1-step segment
+                # draws exactly one delta, like _sample_transition.
                 if s_lo <= new_state[0] <= s_hi and s_lo <= new_state[1] <= s_hi:
                     break
             else:
@@ -519,20 +526,22 @@ class SpriteWorldSegmentDataset(SpriteWorldDataset):
 
     def __getitem__(self, idx: int):
         rng = np.random.default_rng(self.seed + idx)
-        states, actions = self.sample_segment(rng)
+        # Degenerate range spends no RNG draw, so k_min == k_max == 1 keeps the
+        # transition dataset's exact RNG sequence.
+        k = self.k_min if self.k_min == self.k_max else int(
+            rng.integers(self.k_min, self.k_max, endpoint=True))
+        states, actions = self.sample_segment(rng, k)
 
         obs_t   = render_sprite(states[0], self.config)
         obs_tp1 = render_sprite(states[1], self.config)
-        obs_tpk = obs_tp1 if self.num_steps == 1 else render_sprite(
-            states[-1], self.config
-        )
+        obs_tpk = obs_tp1 if k == 1 else render_sprite(states[-1], self.config)
 
         return (
             torch.from_numpy(obs_t),
             torch.from_numpy(actions[0]),
             torch.from_numpy(obs_tp1),
             torch.from_numpy(obs_tpk),
-            torch.from_numpy(actions.mean(axis=0)),
+            torch.tensor(k, dtype=torch.int64),
             torch.from_numpy(states[0].astype(np.float32)),
         )
 

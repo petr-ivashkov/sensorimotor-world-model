@@ -1,2 +1,2 @@
 defaults: [goal_base]
-model_runs: [1_dot_1_random_k1, 1_dot_1_random_k2, 1_dot_1_random_k4, 1_dot_1_random_k8]
+model_runs: [1_dot_1_random_kmax1, 1_dot_1_random_kmax2, 1_dot_1_random_kmax4, 1_dot_1_random_kmax8]

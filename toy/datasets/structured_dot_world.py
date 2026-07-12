@@ -569,26 +569,28 @@ def _canvas_bounds(config: StructuredDotWorldConfig) -> Tuple[int, int]:
 
 
 class StructuredDotWorldSegmentDataset(StructuredDotWorldDataset):
-    """PyTorch dataset generating k-step trajectory segments.
+    """PyTorch dataset generating k-step trajectory segments with random k.
 
-    Extends the transition dataset to a horizon ``num_steps`` = k: a segment
-    (s_t, a_t, s_{t+1}, a_{t+1}, ..., s_{t+k}) is sampled and exposed through
-    the frames needed by the multistep inverse objective.
+    Multi-step inverse construction of Lamb et al. (arXiv 2207.08229): per
+    example a horizon k is sampled uniformly from {k_min .. k_max}, a k-step
+    segment (s_t, a_t, ..., s_{t+k}) is rolled out, and the *first* action a_t
+    is the inverse target for the endpoint pair (o_t, o_{t+k}).
 
-    Sampling matches ``_sample_transition`` step-for-step: initial positions in
-    the margin box, then per step a rejection loop over group displacements.
-    The only addition is an in-canvas acceptance check, which is vacuous on the
-    first step (the margin guarantees it), so for ``num_steps=1`` this dataset
-    draws the *same RNG sequence* as StructuredDotWorldDataset and returns
-    bitwise-identical (obs_t, action, obs_tp1, positions_t) fields.
+    Segment sampling matches ``_sample_transition`` step-for-step: initial
+    positions in the margin box, then per step a rejection loop over group
+    displacements. The only addition is an in-canvas acceptance check, which
+    is vacuous on the first step (the margin guarantees it). When
+    ``k_min == k_max`` no RNG draw is spent on k, so for ``k_min == k_max == 1``
+    this dataset draws the *same RNG sequence* as StructuredDotWorldDataset
+    and returns bitwise-identical (obs_t, action, obs_tp1, positions_t) fields.
 
     Returns
     -------
     obs_t      : (3, H, W) float32   — observation at time t
-    action     : (action_dim,) float32 — first action a_t (feeds the forward loss)
+    action     : (action_dim,) float32 — first action a_t (forward + inverse target)
     obs_tp1    : (3, H, W) float32   — observation at time t+1
     obs_tpk    : (3, H, W) float32   — observation at time t+k
-    action_mean: (action_dim,) float32 — (1/k)·Σ_i a_{t+i} (multistep inverse target)
+    k          : () int64            — this example's horizon
     positions_t: (num_dots * 2,) float32 — flattened (x, y) positions at t
     """
 
@@ -597,17 +599,19 @@ class StructuredDotWorldSegmentDataset(StructuredDotWorldDataset):
         config: Optional[StructuredDotWorldConfig] = None,
         num_samples: int = 10_000,
         seed: int = 0,
-        num_steps: int = 1,
+        k_min: int = 1,
+        k_max: int = 1,
     ):
         super().__init__(config=config, num_samples=num_samples, seed=seed)
-        if num_steps < 1:
-            raise ValueError(f"num_steps must be >= 1, got {num_steps}")
-        self.num_steps = num_steps
+        if not 1 <= k_min <= k_max:
+            raise ValueError(f"Need 1 <= k_min <= k_max, got ({k_min}, {k_max})")
+        self.k_min = k_min
+        self.k_max = k_max
 
     def sample_segment(
-        self, rng: np.random.Generator
+        self, rng: np.random.Generator, num_steps: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Sample one k-step segment.
+        """Sample one ``num_steps``-step segment.
 
         Returns
         -------
@@ -627,7 +631,7 @@ class StructuredDotWorldSegmentDataset(StructuredDotWorldDataset):
         positions = [self._sample_initial_positions(rng, lo, hi)]
         actions: List[np.ndarray] = []
 
-        for _ in range(self.num_steps):
+        for _ in range(num_steps):
             pos = positions[-1]
             for _ in range(self._MAX_REJECTION_ATTEMPTS):
                 displacements = np.zeros((cfg.num_dots, 2), dtype=np.int32)
@@ -662,8 +666,8 @@ class StructuredDotWorldSegmentDataset(StructuredDotWorldDataset):
                 new_pos = pos + displacements
 
                 # Acceptance = transition-dataset rule + in-canvas.  On the first
-                # step in-canvas always holds (margin), so num_steps=1 accepts and
-                # rejects exactly like _sample_transition.
+                # step in-canvas always holds (margin), so a 1-step segment
+                # accepts and rejects exactly like _sample_transition.
                 overlap_ok = (
                     cfg.allow_overlap or cfg.num_dots == 1
                     or not self._has_overlap(new_pos)
@@ -690,11 +694,15 @@ class StructuredDotWorldSegmentDataset(StructuredDotWorldDataset):
 
     def __getitem__(self, idx: int):
         rng = np.random.default_rng(self.seed + idx)
-        positions, actions = self.sample_segment(rng)
+        # Degenerate range spends no RNG draw, so k_min == k_max == 1 keeps the
+        # transition dataset's exact RNG sequence.
+        k = self.k_min if self.k_min == self.k_max else int(
+            rng.integers(self.k_min, self.k_max, endpoint=True))
+        positions, actions = self.sample_segment(rng, k)
 
         obs_t   = render_dots(positions[0], self._color_indices, self.config)
         obs_tp1 = render_dots(positions[1], self._color_indices, self.config)
-        obs_tpk = obs_tp1 if self.num_steps == 1 else render_dots(
+        obs_tpk = obs_tp1 if k == 1 else render_dots(
             positions[-1], self._color_indices, self.config
         )
 
@@ -703,7 +711,7 @@ class StructuredDotWorldSegmentDataset(StructuredDotWorldDataset):
             torch.from_numpy(actions[0]),
             torch.from_numpy(obs_tp1),
             torch.from_numpy(obs_tpk),
-            torch.from_numpy(actions.mean(axis=0)),
+            torch.tensor(k, dtype=torch.int64),
             torch.from_numpy(positions[0].reshape(-1).astype(np.float32)),
         )
 

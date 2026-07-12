@@ -108,6 +108,55 @@ class InverseModel(nn.Module):
 
 
 # ──────────────────────────────────────────────────────────────────
+#  Multistep inverse dynamics model (Lamb et al., arXiv 2207.08229)
+# ──────────────────────────────────────────────────────────────────
+
+class MultistepInverseModel(nn.Module):
+    """
+    Predicts the FIRST action â_t = h_ψ(z_t, z_{t+k}, k) of a k-step segment.
+
+    Same 2-layer MLP as InverseModel, with a one-hot encoding of the horizon
+    k ∈ {1..k_max} appended to the input. Conditioning on k is explicit, as in
+    Lamb et al.'s multi-step inverse construction, for two reasons: the
+    identifiability argument is per-horizon (the k-conditioned family is what
+    separates endogenous from exogenous state), and in these worlds the
+    regression optimum genuinely depends on k — with i.i.d. uniform actions the
+    steps are exchangeable given the endpoint displacement S, so
+    E[a_t | z_t, z_{t+k}, k] = S/k, which a horizon-agnostic head cannot
+    represent for two different k at the same endpoints. A one-hot through the
+    first linear layer is exactly a learned k-embedding, with no extra
+    hyperparameter.
+    """
+
+    def __init__(self, latent_dim: int = 64, action_dim: int = 2,
+                 hidden_dim: int = 256, k_max: int = 8):
+        super().__init__()
+        if k_max < 1:
+            raise ValueError(f"k_max must be >= 1, got {k_max}.")
+        self.k_max = k_max
+        self.net = nn.Sequential(
+            nn.Linear(2 * latent_dim + k_max, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, action_dim),
+        )
+
+    def forward(self, z: torch.Tensor, z_tpk: torch.Tensor,
+                k: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            z:     (B, latent_dim) — embedding at t.
+            z_tpk: (B, latent_dim) — embedding at t+k.
+            k:     (B,) int64 — horizon of each pair, in [1, k_max].
+        Returns:
+            (B, action_dim) predicted first action a_t (unbounded).
+        """
+        k_onehot = nn.functional.one_hot(k - 1, self.k_max).to(z.dtype)
+        return self.net(torch.cat([z, z_tpk, k_onehot], dim=-1))
+
+
+# ──────────────────────────────────────────────────────────────────
 #  Probe decoder
 # ──────────────────────────────────────────────────────────────────
 

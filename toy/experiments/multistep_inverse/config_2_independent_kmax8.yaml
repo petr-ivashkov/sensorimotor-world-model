@@ -1,0 +1,9 @@
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: independent, num_dots: 2}
+training:
+  horizon_k_min: 1
+  horizon_k_max: 8          # k ~ U{1..8} per example; first-action target; k_max=1 == train.py
+output:
+  run_name: 2_independent_kmax8

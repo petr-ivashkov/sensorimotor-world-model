@@ -33,10 +33,11 @@ done
 for c in none x xy xyt; do python train.py --config experiments/sprite_decoder/config_$c.yaml; done
 for c in none x xy xyt; do python train_decoder.py --config experiments/sprite_decoder/config_decoder_$c.yaml; done
 
-# multistep_inverse — horizon-k inverse regularizer + oracle-subgoal goal reaching
-# (see experiments/multistep_inverse/README.md; k=1 reproduces train.py exactly)
-experiments/multistep_inverse/run.sh        # 20 training runs (5 envs × k ∈ {1,2,4,8})
-experiments/multistep_inverse/run_eval.sh   # goal-reaching eval for every run
+# multistep_inverse — first-action multistep inverse (Lamb et al., 2207.08229)
+# + oracle-subgoal goal reaching (see experiments/multistep_inverse/README.md;
+# horizon_k_max=1 reproduces train.py exactly)
+experiments/multistep_inverse/run.sh        # 20 training runs (5 envs × k_max ∈ {1,2,4,8})
+experiments/multistep_inverse/run_eval.sh   # goal-reaching eval (replanning + open-loop)
 python experiments/multistep_inverse/aggregate_results.py
 ```
 

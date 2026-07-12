@@ -1,13 +1,16 @@
 """Aggregate multistep-inverse results into one table.
 
-For every run under results/ this reports, per (env, horizon_k):
+For every run under results/ this reports, per (env, horizon_k_max):
 
   - final eval forward / inverse losses            (train_history.pt)
+  - final eval inverse loss per horizon k          (inv@k columns — the
+    first-action multimodality instrumentation)
   - effective rank of the final latent snapshot    (embeddings.pt; the
     structured_dots notebook's PCA convention) vs. the true controllable dim
   - held-out ridge-probe R² of z_t for controllable and uncontrollable state
     coordinates — "does multistep IDR still recover the controllable DOFs"
-  - goal-reaching success rate per subgoal spacing (goal_reaching.pt)
+  - goal-reaching success rate per subgoal spacing and execution mode
+    (goal_reaching.pt: succ@m = replanning, ol_succ@m = open-loop)
 
 Writes results/summary.csv and prints the table.
 
@@ -115,7 +118,7 @@ def collect_run(run_dir: Path) -> dict | None:
     row = {
         "run": run_dir.name,
         "world": str(run_cfg["dataset"].get("world", "structured")).lower(),
-        "horizon_k": int(run_cfg["training"].get("horizon_k", 1)),
+        "k_max": int(run_cfg["training"].get("horizon_k_max", 1)),
         "true_dim": world_cfg.action_dim,
     }
 
@@ -124,6 +127,10 @@ def collect_run(run_dir: Path) -> dict | None:
         hist = torch.load(hist_path, map_location="cpu", weights_only=False)
         row["eval_fwd"] = hist["eval"]["fwd"][-1]
         row["eval_inv"] = hist["eval"]["inv"][-1]
+        per_k = hist["eval"].get("inv_per_k")
+        if per_k:
+            for k, v in sorted(per_k[-1].items()):
+                row[f"inv@{k}"] = v
 
     emb_path = run_dir / "embeddings.pt"
     if emb_path.exists():
@@ -139,9 +146,16 @@ def collect_run(run_dir: Path) -> dict | None:
     gr_path = run_dir / "goal_reaching.pt"
     if gr_path.exists():
         gr = torch.load(gr_path, map_location="cpu", weights_only=False)
-        for m in gr["spacings"]:
-            row[f"succ@{m}"] = gr["summary"][m]["success_rate"]
-            row[f"pos_err@{m}"] = gr["summary"][m]["pos_err_mean"]
+        if "modes" not in gr:      # pre-rewrite (mean-action) file: skip, don't crash
+            print(f"  [stale goal_reaching.pt, skipping goal columns] {run_dir.name}")
+        else:
+            prefix = {"replanning": "succ", "open_loop": "ol_succ"}
+            for mode in gr["modes"]:
+                for m in gr["spacings"]:
+                    row[f"{prefix[mode]}@{m}"] = gr["summary"][mode][m]["success_rate"]
+                if mode == "replanning":
+                    for m in gr["spacings"]:
+                        row[f"pos_err@{m}"] = gr["summary"][mode][m]["pos_err_mean"]
     return row
 
 
