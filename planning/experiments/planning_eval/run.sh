@@ -4,19 +4,33 @@ set -euo pipefail
 EXPERIMENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$EXPERIMENT_DIR/../.." && pwd)"
 
+if [ -f /etc/profile.d/modules.sh ]; then
+    source /etc/profile.d/modules.sh
+fi
+
+if [ "${LWM_SKIP_CUDA_MODULE:-0}" = "1" ]; then
+    echo "Skipping module load because LWM_SKIP_CUDA_MODULE=1"
+elif command -v module >/dev/null 2>&1; then
+    module load cuda
+else
+    echo "module command not available; continuing without module load"
+fi
+
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}"
 
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <env> <method> <seed_or_repeat>" >&2
+if [ "$#" -lt 3 ]; then
+    echo "Usage: $0 <env> <method> <seed_or_repeat> [eval.py overrides...]" >&2
     echo "  env: tworoom | reacher | pusht | ogbcube" >&2
     echo "  method: forward_only | inverse | sigreg | random" >&2
     echo "  seed_or_repeat: 0 | 1 | 2 | 3 | 4" >&2
+    echo "  overrides: OmegaConf dotlist, e.g. eval.num_eval=4 solver.n_steps=2" >&2
     exit 2
 fi
 
 ENV_SLUG="$1"
 METHOD="$2"
 SEED_OR_REPEAT="$3"
+shift 3
 
 case "$ENV_SLUG" in
     tworoom|reacher|pusht|ogbcube) ;;
@@ -98,8 +112,8 @@ echo "  config: $CONFIG_FILE"
 echo "  output: $METHOD_ROOT/$RUN_LABEL"
 
 if [ "${LWM_DRY_RUN:-0}" = "1" ]; then
-    echo "Dry run: RUNS_ROOT=$METHOD_ROOT python -u $REPO_ROOT/eval.py --config $CONFIG_FILE"
+    echo "Dry run: RUNS_ROOT=$METHOD_ROOT python -u $REPO_ROOT/eval.py --config $CONFIG_FILE $*"
     exit 0
 fi
 
-RUNS_ROOT="$METHOD_ROOT" python -u "$REPO_ROOT/eval.py" --config "$CONFIG_FILE"
+RUNS_ROOT="$METHOD_ROOT" python -u "$REPO_ROOT/eval.py" --config "$CONFIG_FILE" "$@"

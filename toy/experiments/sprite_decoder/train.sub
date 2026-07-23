@@ -1,0 +1,18 @@
+executable = run.sh
+output = condor.$(Cluster).$(Process).out
+error  = condor.$(Cluster).$(Process).err
+log    = condor.$(Cluster).log
+request_cpus   = 4
+request_memory = 122880
+request_gpus   = 1
+# g164 currently advertises a GPU slot, but PyTorch cannot initialize CUDA there.
+requirements   = !regexp("^g164([.]|$)", TARGET.Machine)
+
+# Full rerun with 250k train samples and 200 epochs.
+# This overwrites results/{none,x,xy,xyt}.
+queue arguments from (
+  config_none.yaml
+  config_x.yaml
+  config_xy.yaml
+  config_xyt.yaml
+)

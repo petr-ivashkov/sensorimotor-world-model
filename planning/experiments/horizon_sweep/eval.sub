@@ -1,0 +1,17 @@
+executable = run.sh
+cpus = 8
+memory_mb = 49152
+
+arguments = $(env_slug) $(method) $(goal_offset)
+output = logs/condor.$(Cluster).$(Process).$(env_slug).$(method).offset_$(goal_offset).out
+error = logs/condor.$(Cluster).$(Process).$(env_slug).$(method).offset_$(goal_offset).err
+log = logs/condor.$(Cluster).$(env_slug).$(method).offset_$(goal_offset).log
+request_cpus = $(cpus)
+request_memory = $(memory_mb)
+request_gpus = 1
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+
+# Planning-horizon sweep: 4 environments x 6 goal offsets x 4 methods = 96 jobs.
+# Run `python generate_configs.py` (writes generated_configs/condor_queue.tsv) and
+# `mkdir -p logs` once before submitting.
+queue env_slug,method,goal_offset from generated_configs/condor_queue.tsv

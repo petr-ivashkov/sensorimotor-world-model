@@ -229,6 +229,14 @@ def write_manifest(rows: list[dict[str, str]], output_dir: Path) -> None:
         writer.writerows(rows)
 
 
+def write_condor_queue(rows: list[dict[str, str]], output_dir: Path) -> None:
+    lines = [
+        "\t".join((row["env"], row["method"], row["goal_offset"]))
+        for row in rows
+    ]
+    (output_dir / "condor_queue.tsv").write_text("\n".join(lines) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -241,6 +249,7 @@ def main() -> None:
 
     rows = generate(args.output_dir, selected_job=args.job_name)
     write_manifest(rows, args.output_dir)
+    write_condor_queue(rows, args.output_dir)
     print(f"Wrote {len(rows)} extended-offset planning configs to {args.output_dir}")
 
 

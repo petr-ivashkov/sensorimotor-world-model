@@ -1,0 +1,9 @@
+# Smoke-test config: 1 epoch decoder probe on the results/smoke encoder.
+# Run sprite_decoder/config_smoke.yaml first.
+defaults: [decoder_base]
+encoder_run: smoke
+decoder:
+  epochs: 1
+  eval_every: 1
+output:
+  run_name: smoke

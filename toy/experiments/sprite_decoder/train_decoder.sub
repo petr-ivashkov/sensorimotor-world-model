@@ -1,0 +1,18 @@
+executable = run_decoder.sh
+output = condor_decoder.$(Cluster).$(Process).out
+error  = condor_decoder.$(Cluster).$(Process).err
+log    = condor_decoder.$(Cluster).log
+request_cpus   = 4
+request_memory = 122880
+request_gpus   = 1
+# g164 currently advertises a GPU slot, but PyTorch cannot initialize CUDA there.
+requirements   = !regexp("^g164([.]|$)", TARGET.Machine)
+
+# Re-training ALL decoders after the encoder runs finish.
+# This overwrites results/{none,x,xy,xyt}/decoder.pt.
+queue arguments from (
+  config_decoder_none.yaml
+  config_decoder_x.yaml
+  config_decoder_xy.yaml
+  config_decoder_xyt.yaml
+)

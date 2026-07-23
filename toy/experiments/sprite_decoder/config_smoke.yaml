@@ -1,0 +1,13 @@
+# Smoke-test config: 1 epoch on a tiny dataset. Exercises the SpriteWorldDataset
+# path (rotation-capable, ControlConfig.XYT). Writes to results/smoke.
+defaults: [sprite_base]
+dataset:
+  control: xyt
+  max_delta_theta: 3.141592653589793
+  train_samples: 2000
+  eval_samples: 200
+training:
+  epochs: 1
+  eval_every: 1
+output:
+  run_name: smoke

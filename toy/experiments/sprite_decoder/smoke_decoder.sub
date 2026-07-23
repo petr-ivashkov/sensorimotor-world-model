@@ -1,0 +1,14 @@
+executable = run_decoder.sh
+arguments = config_decoder_smoke.yaml
+output = condor_decoder.smoke.$(Cluster).$(Process).out
+error  = condor_decoder.smoke.$(Cluster).$(Process).err
+log    = condor_decoder.smoke.$(Cluster).log
+request_cpus   = 4
+request_memory = 122880
+request_gpus   = 1
+# g164 currently advertises a GPU slot, but PyTorch cannot initialize CUDA there.
+requirements   = !regexp("^g164([.]|$)", TARGET.Machine)
+
+# Smoke test: 1 epoch decoder probe on the results/smoke encoder.
+# Requires sprite_decoder/smoke.sub to have finished.
+queue 1

@@ -1,0 +1,97 @@
+executable = run.sh
+cpus = 8
+memory_mb = 49152
+
+arguments = $(env_slug) $(method) $(seed_or_repeat)
+output = logs/condor.$(Cluster).$(Process).$(env_slug).$(method).$(seed_or_repeat).out
+error = logs/condor.$(Cluster).$(Process).$(env_slug).$(method).$(seed_or_repeat).err
+log = logs/condor.$(Cluster).$(env_slug).$(method).$(seed_or_repeat).log
+request_cpus = $(cpus)
+request_memory = $(memory_mb)
+request_gpus = 1
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+
+# Planning-performance evaluation: 4 environments x 4 methods x 5 seeds/repeats = 80 jobs.
+# Run `python generate_configs.py` and `mkdir -p logs` once before submitting.
+queue env_slug,method,seed_or_repeat from (
+tworoom forward_only 0
+tworoom forward_only 1
+tworoom forward_only 2
+tworoom forward_only 3
+tworoom forward_only 4
+tworoom inverse 0
+tworoom inverse 1
+tworoom inverse 2
+tworoom inverse 3
+tworoom inverse 4
+tworoom sigreg 0
+tworoom sigreg 1
+tworoom sigreg 2
+tworoom sigreg 3
+tworoom sigreg 4
+tworoom random 0
+tworoom random 1
+tworoom random 2
+tworoom random 3
+tworoom random 4
+reacher forward_only 0
+reacher forward_only 1
+reacher forward_only 2
+reacher forward_only 3
+reacher forward_only 4
+reacher inverse 0
+reacher inverse 1
+reacher inverse 2
+reacher inverse 3
+reacher inverse 4
+reacher sigreg 0
+reacher sigreg 1
+reacher sigreg 2
+reacher sigreg 3
+reacher sigreg 4
+reacher random 0
+reacher random 1
+reacher random 2
+reacher random 3
+reacher random 4
+pusht forward_only 0
+pusht forward_only 1
+pusht forward_only 2
+pusht forward_only 3
+pusht forward_only 4
+pusht inverse 0
+pusht inverse 1
+pusht inverse 2
+pusht inverse 3
+pusht inverse 4
+pusht sigreg 0
+pusht sigreg 1
+pusht sigreg 2
+pusht sigreg 3
+pusht sigreg 4
+pusht random 0
+pusht random 1
+pusht random 2
+pusht random 3
+pusht random 4
+ogbcube forward_only 0
+ogbcube forward_only 1
+ogbcube forward_only 2
+ogbcube forward_only 3
+ogbcube forward_only 4
+ogbcube inverse 0
+ogbcube inverse 1
+ogbcube inverse 2
+ogbcube inverse 3
+ogbcube inverse 4
+ogbcube sigreg 0
+ogbcube sigreg 1
+ogbcube sigreg 2
+ogbcube sigreg 3
+ogbcube sigreg 4
+ogbcube random 0
+ogbcube random 1
+ogbcube random 2
+ogbcube random 3
+ogbcube random 4
+)

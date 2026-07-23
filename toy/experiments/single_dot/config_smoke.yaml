@@ -1,0 +1,14 @@
+# Smoke-test config: 1 epoch on a tiny dataset. Validates the toy pipeline
+# end-to-end (dataset -> train -> save_outputs) without producing paper results.
+# Writes to results/smoke, so it never overwrites `baseline`.
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: independent, num_dots: 1}
+  train_samples: 2000
+  eval_samples: 200
+training:
+  epochs: 1
+  eval_every: 1
+output:
+  run_name: smoke

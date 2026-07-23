@@ -1,0 +1,15 @@
+# Smoke-test config: 1 epoch on a tiny dataset. Exercises the multi-group
+# (independent + coupled + random) dataset path. Writes to results/smoke.
+defaults: [dot_base]
+dataset:
+  groups:
+    - {motion: independent, num_dots: 2}
+    - {motion: coupled,     num_dots: 2}
+    - {motion: random,      num_dots: 1}
+  train_samples: 2000
+  eval_samples: 200
+training:
+  epochs: 1
+  eval_every: 1
+output:
+  run_name: smoke

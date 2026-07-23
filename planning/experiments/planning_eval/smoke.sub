@@ -1,0 +1,30 @@
+executable = run.sh
+cpus = 8
+memory_mb = 49152
+
+# Smoke test: 4 evaluation episodes and a 2-iteration CEM, one job per
+# environment. Validates checkpoint loading, World construction, the MuJoCo /
+# pymunk env stack, and the CEM planning loop -- without touching the real
+# results tree (RUNS_ROOT is redirected to results_smoke).
+#
+# Requires trained checkpoints under experiments/train/results/. Run
+# `python generate_configs.py`, `mkdir -p logs results_smoke` before submitting.
+environment = "RUNS_ROOT=$ENV(PWD)/results_smoke"
+
+arguments = $(env_slug) $(method) $(seed_or_repeat) eval.num_eval=4 world.num_envs=4 solver.n_steps=2 solver.num_samples=32 solver.topk=8
+
+output = logs/condor.smoke.$(Cluster).$(Process).$(env_slug).$(method).out
+error = logs/condor.smoke.$(Cluster).$(Process).$(env_slug).$(method).err
+log = logs/condor.smoke.$(Cluster).$(env_slug).$(method).log
+request_cpus = $(cpus)
+request_memory = $(memory_mb)
+request_gpus = 1
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+
+queue env_slug,method,seed_or_repeat from (
+tworoom inverse 0
+reacher inverse 0
+pusht inverse 0
+ogbcube inverse 0
+ogbcube random 0
+)
