@@ -1,0 +1,39 @@
+# Planning-eval smoke config for the history_size=3 checkpoint produced by
+# experiments/train/smoke_h3.sub. Kept as an explicit config because `runs` is a
+# list and OmegaConf dotlist overrides cannot address list elements
+# ("Cannot merge DictConfig with ListConfig").
+#
+# eval.py rebuilds the model from the run's own saved config.yaml, so history_size=3
+# is picked up automatically and eval.build_world derives
+# wrapper_history_size = (3-1)*action_block + 1 = 11.
+defaults:
+  - /eval/base
+  - /eval/env/ogbcube
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+  - _self_
+
+hydra:
+  searchpath:
+    - file://${oc.env:REPO_ROOT}/config
+
+seed: 52025
+
+runs:
+  - name: smoke_h3
+    run_dir: ${oc.env:REPO_ROOT}/experiments/train/results_smoke/smoke_h3
+
+world:
+  num_envs: 4
+
+solver:
+  n_steps: 2
+  num_samples: 32
+  topk: 8
+
+eval:
+  num_eval: 4
+  goal_offset_steps: 25
+  eval_budget: 50
+  task_seed: 42025
+  save_video: false

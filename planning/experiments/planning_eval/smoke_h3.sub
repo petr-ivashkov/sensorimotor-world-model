@@ -1,0 +1,26 @@
+executable = run_smoke_h3.sh
+cpus = 8
+memory_mb = 49152
+
+# Planning-eval smoke against the history_size=3 checkpoint from
+# train/smoke_h3.sub. This is the only test that drives jepa.rollout's multi-frame
+# branch through swm.World + WorldModelPolicy; eval.py rebuilds the model from the
+# run's saved config.yaml, so history_size=3 is picked up automatically.
+#
+# Settings live in smoke_h3_config.yaml (runs is a list, so it cannot be
+# overridden from the command line).
+# Requires train/smoke_h3.sub to have finished.
+# Submit with: condor_submit_bid 100 smoke_h3.sub
+environment = "RUNS_ROOT=$ENV(PWD)/results_smoke"
+
+arguments = 
+
+output = logs/condor.smoke_h3.$(Cluster).$(Process).out
+error = logs/condor.smoke_h3.$(Cluster).$(Process).err
+log = logs/condor.smoke_h3.$(Cluster).log
+request_cpus = $(cpus)
+request_memory = $(memory_mb)
+request_gpus = 1
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+
+queue 1

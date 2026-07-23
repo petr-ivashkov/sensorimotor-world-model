@@ -11,7 +11,7 @@ memory_mb = 163840
 # `mkdir -p results_smoke` alongside it.
 environment = "RUNS_ROOT=$ENV(PWD)/results_smoke"
 
-arguments = $(run_name) trainer.max_epochs=1 trainer.limit_train_batches=5 trainer.limit_val_batches=2 wandb.enabled=false artifacts.embedding_subset_size=256
+arguments = $(run_name) trainer.max_epochs=1 +trainer.limit_train_batches=5 trainer.val_check_interval=5 trainer.limit_val_batches=2 wandb.enabled=false artifacts.embedding_subset_size=256
 
 output = condor.smoke.$(Cluster).$(Process).$(run_name).out
 error = condor.smoke.$(Cluster).$(Process).$(run_name).err
