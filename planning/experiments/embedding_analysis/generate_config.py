@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -71,11 +72,20 @@ def find_one(results_dir: Path, pattern: str) -> Path:
     return matches[0]
 
 
-def repo_relative(path: Path) -> str:
+def run_dir_ref(path: Path) -> str:
+    """Build the ``run_dir`` reference written into the generated config.
+
+    Uses a lexical absolute path rather than ``Path.resolve()``: run directories are
+    commonly symlinked into ``experiments/train/results/`` from another checkout, and
+    resolving would follow the link outside the repo, making the path non-relative.
+    Paths that are genuinely outside the repo are emitted absolute, without the
+    ``${REPO_ROOT}`` prefix.
+    """
+    abs_path = Path(os.path.abspath(path))
     try:
-        return str(path.resolve().relative_to(REPO_ROOT))
+        return "${oc.env:REPO_ROOT}/" + str(abs_path.relative_to(REPO_ROOT))
     except ValueError:
-        return str(path.resolve())
+        return str(abs_path)
 
 
 def build_config(results_dir: Path, train_suffix: str, eval_suffix: str) -> dict:
@@ -96,7 +106,7 @@ def build_config(results_dir: Path, train_suffix: str, eval_suffix: str) -> dict
                     "name": method_spec["name"],
                     "label": method_spec["label"],
                     "seed": 0,
-                    "run_dir": "${oc.env:REPO_ROOT}/" + repo_relative(run_dir),
+                    "run_dir": run_dir_ref(run_dir),
                     "output_dir": (
                         "${oc.env:REPO_ROOT}/experiments/embedding_analysis/"
                         f"outputs/{slug}/{method_spec['name']}"
@@ -149,7 +159,7 @@ def main() -> int:
     if args.output.exists() and not args.overwrite:
         raise SystemExit(f"{args.output} already exists; pass --overwrite to replace it.")
 
-    cfg = build_config(args.results_dir.resolve(), args.train_suffix, args.eval_suffix)
+    cfg = build_config(Path(os.path.abspath(args.results_dir)), args.train_suffix, args.eval_suffix)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(config=OmegaConf.create(cfg), f=args.output)
     print(f"Wrote {args.output}")
