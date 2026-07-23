@@ -2582,21 +2582,21 @@ wheels = [
 
 [[package]]
 name = "pymunk"
-version = "6.11.1"
+version = "7.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cffi" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/c6/ea45f078e138c133d6c0c00457941bb4bd9554be9a763801f32f3470f426/pymunk-6.11.1.tar.gz", hash = "sha256:1917849f63e1f699df21d6a1f5d1c250adddbae25e9c124f0bed765154c94ef8", size = 3362971, upload-time = "2025-02-09T15:37:13.948Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e3/28/988198dded8d0c9efcd872dd5bafa5e25654f29f500a4601c4c6fcb5b379/pymunk-7.3.0.tar.gz", hash = "sha256:11de74fdce68f47514c2e6e58ef5502a0bb68ba1c3c77e4e359baa466e9d4c16", size = 3553081, upload-time = "2026-06-17T20:21:24.34Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/fb/a815fe0b996de43f06857b14fe0839cda998df36b802c9eeb8e6b5b21f80/pymunk-6.11.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:de6bc2cb91e1840c6fff064658b1763117918a1c5762c3170087e7b6f6c6fb77", size = 364628, upload-time = "2025-02-09T15:35:33.113Z" },
-    { url = "https://files.pythonhosted.org/packages/44/a6/cef48493f6c94df6bf540640b520b6dd770176992fec5d1bf172caa4033f/pymunk-6.11.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:dc3216eda378fc190356b2b0be8d92a179b084dbc09ac6e8a541eb8b8b7cb28f", size = 346980, upload-time = "2025-02-09T15:35:34.693Z" },
-    { url = "https://files.pythonhosted.org/packages/55/fc/d31a3773e79925c0ea263a8eed2df1507c548a92ea07e7e13536586528b8/pymunk-6.11.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e63c59f4194468c741b1cecbd550c59d3d297ce977159d524fd858a40edb01e3", size = 1070943, upload-time = "2025-02-09T15:35:37.171Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/7b/cf379cb97a2841ec7db31153a528564f9e80262214d90acd83c0b50966b4/pymunk-6.11.1-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:ac35e4852660f2cc9071211ffced7bae770343d3b183b3c0261ef0af7fd4acd1", size = 990285, upload-time = "2025-02-09T15:35:39.775Z" },
-    { url = "https://files.pythonhosted.org/packages/10/72/8124c0848e1a676f4b1a2d5b4f33e820a8eda70e4becdff2cf5a87f1811d/pymunk-6.11.1-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:c44e9252fd05eee48f76454764a57d102524cd012849e427c617740d7108d105", size = 976194, upload-time = "2025-02-09T15:35:42.958Z" },
-    { url = "https://files.pythonhosted.org/packages/39/a3/4bc599ef3f4fc48f5ada8d600fd39d16c8336bb073ea45b36b300803f636/pymunk-6.11.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:edfc298d4697fdf2fe2e1b1caa9bb3a882c28c5f13ab72baeb30467a221e38d8", size = 1042166, upload-time = "2025-02-09T15:35:45.695Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/5c/eca16e3008239f6840c14c03f25842c56d1abd775fd65dd8214245ed045a/pymunk-6.11.1-cp312-cp312-win32.whl", hash = "sha256:85e46a518cc63ceb6d0b10e6b090844b111e84d89dac5b2d646c345db3dba099", size = 315148, upload-time = "2025-02-09T15:35:48.453Z" },
-    { url = "https://files.pythonhosted.org/packages/77/63/20c7ad048493ee518ce6f8904da77863ddde2c1bf867622944fb3712e436/pymunk-6.11.1-cp312-cp312-win_amd64.whl", hash = "sha256:f747f26177c74ea9c5883bc702ae4b6096c65e50d18306596de5e8e15179f113", size = 366522, upload-time = "2025-02-09T15:35:50.195Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/12/c03db9b316c895f0d2b0c957da93f21d4d27cafdd5a3a9af4beb7ba97234/pymunk-7.3.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:ebf393a305fad8fc383383f4d3e93e2750fe663102f4c59e989479fdfb040159", size = 369519, upload-time = "2026-06-17T20:16:06.073Z" },
+    { url = "https://files.pythonhosted.org/packages/13/1b/801e607d75b4b59d7282e973735cc3946c82492f773b4cb989ea98345c41/pymunk-7.3.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:5423feb7df3083c13b0fdc60c1d20be567dbb19c0c0d15ffe208fd457bfd1383", size = 351022, upload-time = "2026-06-17T20:16:07.903Z" },
+    { url = "https://files.pythonhosted.org/packages/77/97/abbd73c16cc07223c1d246169f405d2f3eb81c1b69a010d08e283bdd129c/pymunk-7.3.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:0c03d50a45ede33a0b4b75ab4834e223cd07882d9e79d0a3aae2a8bd85ace123", size = 986531, upload-time = "2026-06-17T20:16:10.371Z" },
+    { url = "https://files.pythonhosted.org/packages/63/e2/730915525815c4a32629bf99b9d4e27546e4859b508596a2c86ed69a46d8/pymunk-7.3.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:332e4a3cad0b3407838a9f86f3bdbb622e3f72cc821709cee917c473cb4787aa", size = 1014874, upload-time = "2026-06-17T20:16:13.02Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/da/b1c7dea021e2269306cb123822899e81ab24ccf810002f6c590464fdfb20/pymunk-7.3.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:90e2a054c676988488597ecacdeb4b2de9dba21c20539c3c492a6aca51d1262e", size = 983864, upload-time = "2026-06-17T20:16:15.217Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/6b/1539ace49b675c2a9baab00fe6d38d5be17c9d72fba1623aa51e4e1fd61e/pymunk-7.3.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:235090ae8fbada8e3f272bb58000679bd13aef9366e7181f7dc96e407404c1b0", size = 1013494, upload-time = "2026-06-17T20:16:18.639Z" },
+    { url = "https://files.pythonhosted.org/packages/23/9d/40e3e18b3e2c4cd29ee4504d5d478dc0c9339722ad32382fb1f3ffe113d6/pymunk-7.3.0-cp312-cp312-win32.whl", hash = "sha256:9c0d3642da364aed1acffe32315baf7d4e347ba9a66a59bd5b9b23e295799218", size = 317859, upload-time = "2026-06-17T20:16:20.58Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/7c/62f0fc91c92468ecb6a3269b33937eb71dc7aedf9da1867bd973577b124f/pymunk-7.3.0-cp312-cp312-win_amd64.whl", hash = "sha256:146e5be2b7688b728516c65097590074c70cf684fcbe1b2593282cd79e728ba9", size = 370498, upload-time = "2026-06-17T20:16:22.412Z" },
 ]
 
 [[package]]
@@ -3034,7 +3034,7 @@ requires-dist = [
     { name = "opencv-python-headless" },
     { name = "pandas", specifier = ">=3.0.1" },
     { name = "pyarrow", specifier = "<21" },
-    { name = "pymunk", specifier = "<7" },
+    { name = "pymunk", specifier = ">=7" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "scikit-learn" },
     { name = "stable-pretraining", specifier = "==0.1.6" },

@@ -23,7 +23,7 @@ dependencies = [
     "lightning==2.6.1",
     "numpy==2.2.6",  # shared with toy/
     "gym-pusht==0.1.6",
-    "pymunk<7",
+    "pymunk>=7",  # swm 0.0.6 PushT uses Space.on_collision, added in pymunk 7.
     "opencv-python-headless",
     "einops",
     "hydra-core",
