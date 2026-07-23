@@ -1,0 +1,26 @@
+# @package _global_
+
+world:
+  env_name: swm/ReacherDMControl-v0
+  task: qpos_match
+
+dataset:
+  keys_to_cache:
+    - action
+    - observation
+
+eval:
+  dataset_name: reacher_eval
+  # TODO: Confirm reacher_eval.h5 contains qpos/qvel columns as expected from
+  # stable_worldmodel's DMControl wrapper; this file is not present locally.
+  callables:
+    - method: set_state
+      args:
+        qpos:
+          value: qpos
+        qvel:
+          value: qvel
+    - method: set_target_qpos
+      args:
+        target_qpos:
+          value: goal_qpos

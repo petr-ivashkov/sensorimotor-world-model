@@ -17,9 +17,11 @@ dist/
 build/
 
 # Virtual environments
+# Anchored to the repo root: an unanchored `env/` matches any directory named `env`
+# at any depth, which silently excluded planning/config/eval/env/*.yaml.
 .venv/
-venv/
-env/
+/venv/
+/env/
 .env
 
 # Jupyter

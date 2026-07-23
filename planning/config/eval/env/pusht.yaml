@@ -1,0 +1,22 @@
+# @package _global_
+
+world:
+  env_name: swm/PushT-v1
+
+dataset:
+  keys_to_cache:
+    - action
+    - proprio
+    - state
+
+eval:
+  dataset_name: pusht_expert_eval
+  callables:
+    - method: _set_state
+      args:
+        state:
+          value: state
+    - method: _set_goal_state
+      args:
+        goal_state:
+          value: goal_state

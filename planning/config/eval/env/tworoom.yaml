@@ -1,0 +1,21 @@
+# @package _global_
+
+world:
+  env_name: swm/TwoRoom-v1
+
+dataset:
+  keys_to_cache:
+    - action
+    - proprio
+
+eval:
+  dataset_name: tworoom_eval
+  callables:
+    - method: _set_state
+      args:
+        state:
+          value: proprio
+    - method: _set_goal_state
+      args:
+        goal_state:
+          value: goal_proprio

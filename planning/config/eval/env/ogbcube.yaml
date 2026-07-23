@@ -1,0 +1,34 @@
+# @package _global_
+
+world:
+  env_name: swm/OGBCube-v0
+  env_type: single
+  ob_type: states
+  multiview: false
+  width: ${eval.img_size}
+  height: ${eval.img_size}
+  visualize_info: false
+  terminate_at_goal: true
+
+dataset:
+  keys_to_cache:
+    - action
+
+eval:
+  dataset_name: cube_single_expert_eval
+  callables:
+    - method: set_state
+      args:
+        qpos:
+          value: qpos
+        qvel:
+          value: qvel
+    - method: set_target_pos
+      args:
+        cube_id:
+          value: 0
+          in_dataset: false
+        target_pos:
+          value: goal_privileged_block_0_pos
+        target_quat:
+          value: goal_privileged_block_0_quat
