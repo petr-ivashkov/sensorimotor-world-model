@@ -2,16 +2,8 @@ executable = run.sh
 cpus = 32
 memory_mb = 163840
 
-# Smoke test for the multi-frame path (wm.history_size=3), which no paper run ever
-# exercised. train.py raises data.dataset.num_steps to history_size+1 automatically.
-# Writes to results_smoke/smoke_h3; feed that checkpoint to planning_eval/smoke_h3.sub.
-#
-# LWM_ALLOW_OVERWRITE=1 is required and safe here: run.sh's guard checks
-# $RUNS_ROOT/$RUN_NAME (results_smoke/cube_inverse_lambda_1_seed0, which smoke.sub
-# already populated), but the Hydra `subdir=smoke_h3` override sends all output to
-# $RUNS_ROOT/smoke_h3 instead. The guarded directory is never written to. Nothing is
-# deleted or moved -- that would require LWM_FRESH_START=1, which is not set.
-#
+# wm.history_size=3 smoke; writes results_smoke/smoke_h3 for planning_eval/smoke_h3.sub.
+# LWM_ALLOW_OVERWRITE=1 because run.sh guards $RUNS_ROOT/$RUN_NAME while subdir= redirects output.
 # Submit with: condor_submit_bid 100 smoke_h3.sub
 environment = "RUNS_ROOT=$ENV(PWD)/results_smoke LWM_ALLOW_OVERWRITE=1"
 

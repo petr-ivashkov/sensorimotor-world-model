@@ -5,8 +5,7 @@ description = "Sensorimotor world models with a joint forward + inverse-dynamics
 requires-python = ">=3.12,<3.13"
 dependencies = [
     # toy/ — dot-world / sprite experiments (CPU-friendly)
-    "torch>=2.2",
-    "numpy>=1.26",
+    "torch==2.11.0",
     "pandas>=3.0.1",
     "matplotlib>=3.10.8",
     "pyyaml>=6.0",
@@ -14,11 +13,15 @@ dependencies = [
     "jupyter>=1.1.1",
     # planning/ — LeWM-based planning experiments (needs a CUDA GPU to run)
     "stable-worldmodel[train,env]==0.0.6",
-    # gymnasium 1.3.0's `all` extra regressed to box2d-py==2.3.5, which has shipped no
-    # wheel since cp37 and so needs a system `swig` to build. 1.2.x's `all` pulls
-    # box2d==2.3.10, which has cp312 wheels. 1.2.3 is what produced the paper results.
+    # 1.3.0's `all` extra needs box2d-py, which has no wheel past cp37 and needs swig.
     "gymnasium<1.3",
     "stable-pretraining==0.1.6",
+    # Pinned to the checkpoints' training versions; newer transformers renames every ViT parameter.
+    "transformers==5.5.0",
+    "mujoco==3.6.0",
+    "dm-control==1.0.38",
+    "lightning==2.6.1",
+    "numpy==2.2.6",  # shared with toy/
     "gym-pusht==0.1.6",
     "pymunk<7",
     "opencv-python-headless",

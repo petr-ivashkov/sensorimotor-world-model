@@ -85,12 +85,8 @@ def load_jepa_from_run(run_dir: Path, device: str = "cuda"):
         for k, v in ckpt["state_dict"].items()
         if k.startswith("model.")
     }
-    missing, unexpected = model.load_state_dict(state, strict=False)
-    if missing or unexpected:
-        print(
-            f"[{run_dir.name}] load_state_dict: missing={len(missing)} "
-            f"unexpected={len(unexpected)}"
-        )
+    # strict: a mismatch would leave tensors randomly initialised and still plan.
+    model.load_state_dict(state, strict=True)
     model = model.to(device).eval()
     model.requires_grad_(False)
     model.interpolate_pos_encoding = True

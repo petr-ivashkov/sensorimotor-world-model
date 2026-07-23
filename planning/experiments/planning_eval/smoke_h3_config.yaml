@@ -1,11 +1,5 @@
-# Planning-eval smoke config for the history_size=3 checkpoint produced by
-# experiments/train/smoke_h3.sub. Kept as an explicit config because `runs` is a
-# list and OmegaConf dotlist overrides cannot address list elements
-# ("Cannot merge DictConfig with ListConfig").
-#
-# eval.py rebuilds the model from the run's own saved config.yaml, so history_size=3
-# is picked up automatically and eval.build_world derives
-# wrapper_history_size = (3-1)*action_block + 1 = 11.
+# Eval config for the history_size=3 smoke checkpoint. A file rather than CLI overrides
+# because `runs` is a list and OmegaConf dotlists cannot address list elements.
 defaults:
   - /eval/base
   - /eval/env/ogbcube

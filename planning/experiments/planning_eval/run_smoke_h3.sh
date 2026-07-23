@@ -1,9 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Planning-eval smoke for the history_size=3 checkpoint. Mirrors run.sh's environment
-# setup but takes an explicit config instead of the <env> <method> <seed> triple,
-# because the run_dir points into experiments/train/results_smoke/.
+# Like run.sh, but takes an explicit config instead of the <env> <method> <seed> triple.
 
 EXPERIMENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$EXPERIMENT_DIR/../.." && pwd)"
