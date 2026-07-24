@@ -1,0 +1,18 @@
+executable = eval_run.sh
+cpus = 8
+memory_mb = 49152
+
+# History-length ablation planning eval: one job per trained checkpoint = 120 jobs.
+# Requires train.sub to have finished. Run `python generate_configs.py` and
+# `mkdir -p logs` once before submitting.
+# Submit with: condor_submit_bid 100 eval.sub
+arguments = $(run_name)
+output = logs/condor.eval.$(Cluster).$(Process).$(run_name).out
+error = logs/condor.eval.$(Cluster).$(Process).$(run_name).err
+log = logs/condor.eval.$(Cluster).$(run_name).log
+request_cpus = $(cpus)
+request_memory = $(memory_mb)
+request_gpus = 1
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+
+queue run_name from generated_configs/eval_queue.txt
