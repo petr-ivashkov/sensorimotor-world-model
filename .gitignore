@@ -76,3 +76,5 @@ planning/experiments/embedding_analysis/config.yaml
 
 # Rebuttal files
 rebuttal/
+# Aggregated result CSVs: regenerable by aggregate_results.py, carry absolute machine paths
+planning/experiments/*/aggregated_results.csv
