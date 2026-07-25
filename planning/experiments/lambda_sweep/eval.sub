@@ -1,0 +1,15 @@
+executable = eval_run.sh
+cpus = 8
+memory_mb = 49152
+
+# Planning evaluation: one job per trained lambda-sweep checkpoint = 160 jobs.
+arguments = $(run_name)
+output = logs/condor.eval.$(Cluster).$(Process).$(run_name).out
+error = logs/condor.eval.$(Cluster).$(Process).$(run_name).err
+log = logs/condor.eval.$(Cluster).$(run_name).log
+request_cpus = $(cpus)
+request_memory = $(memory_mb)
+request_gpus = 1
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+
+queue run_name from generated_configs/eval_queue.txt

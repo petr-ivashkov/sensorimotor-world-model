@@ -2,7 +2,7 @@
 set -euo pipefail
 
 EXPERIMENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$EXPERIMENT_DIR/../../.." && pwd)"
+REPO_ROOT="$(cd "$EXPERIMENT_DIR/../.." && pwd)"
 
 if [ -f /etc/profile.d/modules.sh ]; then
     source /etc/profile.d/modules.sh
@@ -18,18 +18,13 @@ fi
 
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}"
 
-if [ "$#" -gt 2 ]; then
-    echo "Usage: $0 [lambda_inv] [lambda_label]" >&2
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <run_name> [extra train.py overrides...]" >&2
     exit 2
 fi
 
-LAMBDA_INV="${1:-${LAMBDA_INV:-10}}"
-LAMBDA_LABEL="${2:-${LAMBDA_LABEL:-lambda_${LAMBDA_INV//./p}}}"
-
-case "$LAMBDA_LABEL" in
-    lambda_*) ;;
-    *) LAMBDA_LABEL="lambda_$LAMBDA_LABEL" ;;
-esac
+RUN_NAME="$1"
+shift
 
 cd "$EXPERIMENT_DIR"
 source "$REPO_ROOT/../.venv/bin/activate"
@@ -37,31 +32,34 @@ source "$REPO_ROOT/../.venv/bin/activate"
 export REPO_ROOT
 export EXTERNAL_DATA_ROOT="${EXTERNAL_DATA_ROOT:-$REPO_ROOT/data/external}"
 export GENERATED_DATA_ROOT="${GENERATED_DATA_ROOT:-$REPO_ROOT/data/generated}"
-export RUNS_ROOT="${RUNS_ROOT:-$EXPERIMENT_DIR/results}"
+export RUNS_ROOT="${RUNS_ROOT:-$EXPERIMENT_DIR/results/train}"
 
 /bin/mkdir -p "$EXTERNAL_DATA_ROOT" "$GENERATED_DATA_ROOT" "$RUNS_ROOT"
 
-RUN_DIR="$RUNS_ROOT/$LAMBDA_LABEL"
-if [ -e "$RUN_DIR" ] && [ "$(find "$RUN_DIR" -mindepth 1 -maxdepth 1 -print -quit)" != "" ] && [ "${LWM_ALLOW_OVERWRITE:-0}" != "1" ]; then
-    echo "Refusing to overwrite non-empty run directory: $RUN_DIR" >&2
-    echo "Set LWM_ALLOW_OVERWRITE=1 to intentionally rerun this lambda." >&2
+CONFIG_ROOT="$EXPERIMENT_DIR/generated_configs/train"
+CONFIG_FILE="$CONFIG_ROOT/$RUN_NAME.yaml"
+if [ ! -f "$CONFIG_FILE" ]; then
+    python "$EXPERIMENT_DIR/generate_configs.py"
+fi
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Generated config does not exist: $CONFIG_FILE" >&2
     exit 1
 fi
 
-CONFIG_ARGS=()
-case " $* " in
-    *" --config-path "*|*" --config-dir "*) ;;
-    *) CONFIG_ARGS+=(--config-path "$EXPERIMENT_DIR") ;;
-esac
+RUN_DIR="$RUNS_ROOT/$RUN_NAME"
+if [ -e "$RUN_DIR" ] && [ "$(find "$RUN_DIR" -mindepth 1 -maxdepth 1 -print -quit)" != "" ] && [ "${LWM_ALLOW_OVERWRITE:-0}" != "1" ]; then
+    echo "Refusing to overwrite non-empty run directory: $RUN_DIR" >&2
+    echo "Set LWM_ALLOW_OVERWRITE=1 to intentionally rerun this job." >&2
+    exit 1
+fi
 
-case " $* " in
-    *" --config-name "*) ;;
-    *) CONFIG_ARGS+=(--config-name config) ;;
-esac
-
-echo "Launching Reacher inverse lambda sweep run: loss.inverse.weight=$LAMBDA_INV subdir=$LAMBDA_LABEL"
+echo "Launching lambda-sweep training run: $RUN_NAME"
 python -u "$REPO_ROOT/train.py" \
-    "${CONFIG_ARGS[@]}" \
-    "loss.inverse.weight=$LAMBDA_INV" \
-    "subdir=$LAMBDA_LABEL" \
-    "wandb.config.name=lambda_sweep_train_reacher_${LAMBDA_LABEL}"
+    --config-path "$CONFIG_ROOT" \
+    --config-name "$RUN_NAME" \
+    "$@"
+
+echo "Collecting held-out diagnostics: $RUN_NAME"
+python -u "$EXPERIMENT_DIR/collect_diagnostics.py" \
+    --run-dir "$RUN_DIR" \
+    --device auto
