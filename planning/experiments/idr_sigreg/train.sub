@@ -1,0 +1,16 @@
+executable = train_run.sh
+cpus = 32
+memory_mb = 163840
+
+# IDR+SIGReg training: 4 environments x 5 seeds = 20 jobs.
+# Run `python generate_configs.py` and `mkdir -p logs` before submitting.
+arguments = $(run_name)
+output = logs/condor.train.$(Cluster).$(Process).$(run_name).out
+error = logs/condor.train.$(Cluster).$(Process).$(run_name).err
+log = logs/condor.train.$(Cluster).$(run_name).log
+request_cpus = $(cpus)
+request_memory = $(memory_mb)
+request_gpus = 1
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+
+queue run_name from generated_configs/train_queue.txt
