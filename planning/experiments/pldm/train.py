@@ -138,17 +138,14 @@ def run(cfg):
 
     model = hydra.utils.instantiate(cfg.model)
     idm = hydra.utils.instantiate(cfg.idm)
-    total_steps = int(cfg.trainer.max_epochs) * len(train_loader)
+    with open_dict(cfg):
+        cfg.pldm_experiment.optimizer_updates_per_epoch = len(train_loader)
     optimizers = {}
     for model_name in ('model', 'idm'):
         optimizers[f'{model_name}_opt'] = {
             'modules': model_name,
             'optimizer': dict(cfg.optimizer),
-            'scheduler': {
-                'type': 'LinearWarmupCosineAnnealingLR',
-                'warmup_steps': max(1, int(0.01 * total_steps)),
-                'max_steps': total_steps,
-            },
+            'scheduler': 'LinearWarmupCosineAnnealingLR',
             'interval': 'epoch',
         }
 

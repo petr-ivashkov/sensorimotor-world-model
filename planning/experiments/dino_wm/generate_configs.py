@@ -16,6 +16,12 @@ BACKBONE = 'facebook/dinov2-small'
 BACKBONE_REVISION = 'ed25f3a31f01632728cabb09d1542f84ab7b0056'
 HISTORY = 1
 SEEDS = (0, 1, 2, 3, 4)
+MAX_EPOCHS = 10
+REFERENCE_BATCH_SIZE = 256
+MICRO_BATCH_SIZE = 32
+GRAD_ACCUMULATION_STEPS = REFERENCE_BATCH_SIZE // MICRO_BATCH_SIZE
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-3
 
 NUM_EVAL = 100
 GOAL_OFFSET_STEPS = 25
@@ -132,19 +138,20 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
         },
         'optimizer': {
             'type': 'AdamW',
-            'lr': 5e-4,
-            'weight_decay': 0.0,
+            'lr': LEARNING_RATE,
+            'weight_decay': WEIGHT_DECAY,
         },
         'trainer': {
-            'max_epochs': 10,
+            'max_epochs': MAX_EPOCHS,
             'strategy': 'ddp',
             'devices': 'auto',
             'accelerator': 'gpu',
-            'precision': '16-mixed',
+            'precision': 'bf16',
             'gradient_clip_val': 1.0,
+            'accumulate_grad_batches': GRAD_ACCUMULATION_STEPS,
         },
         'loader': {
-            'batch_size': 32,
+            'batch_size': MICRO_BATCH_SIZE,
             'num_workers': '${num_workers}',
             'drop_last': True,
             'persistent_workers': True,
@@ -152,6 +159,10 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
             'shuffle': True,
         },
         'data': {'dataset': {'num_steps': HISTORY + 1}},
+        'optimization_matching': {
+            'enabled': True,
+            'reference_batch_size': REFERENCE_BATCH_SIZE,
+        },
         'artifacts': {'use_external_callbacks': False},
         'wandb': {
             'enabled': True,
@@ -171,6 +182,8 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
             'backbone_revision': BACKBONE_REVISION,
             'state_key': env.state_key,
             'matched_full_training_split': True,
+            'matched_max_epochs': MAX_EPOCHS,
+            'matched_effective_batch_size': REFERENCE_BATCH_SIZE,
         },
     }
 

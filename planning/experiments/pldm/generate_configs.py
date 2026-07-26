@@ -15,6 +15,10 @@ METHOD = 'pldm'
 SOURCE_COMMIT = '0baacc8118c5f262aeff942da75cf191e71d3c5f'
 HISTORY = 1
 SEEDS = (0, 1, 2, 3, 4)
+MAX_EPOCHS = 10
+BATCH_SIZE = 256
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-3
 
 NUM_EVAL = 100
 GOAL_OFFSET_STEPS = 25
@@ -98,14 +102,14 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
         'encoder_scale': 'tiny',
         'num_workers': 6,
         'trainer': {
-            'max_epochs': 100,
+            'max_epochs': MAX_EPOCHS,
             'devices': 'auto',
             'accelerator': 'gpu',
             'precision': 'bf16',
             'gradient_clip_val': 1.0,
         },
         'loader': {
-            'batch_size': 128,
+            'batch_size': BATCH_SIZE,
             'num_workers': '${num_workers}',
             'drop_last': True,
             'persistent_workers': True,
@@ -115,8 +119,8 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
         },
         'optimizer': {
             'type': 'AdamW',
-            'lr': 5e-5,
-            'weight_decay': 1e-3,
+            'lr': LEARNING_RATE,
+            'weight_decay': WEIGHT_DECAY,
         },
         'wm': {
             'history_size': HISTORY,
@@ -201,6 +205,8 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
             'seed': seed,
             'source_commit': SOURCE_COMMIT,
             'matched_full_training_split': True,
+            'matched_max_epochs': MAX_EPOCHS,
+            'matched_effective_batch_size': BATCH_SIZE,
         },
     }
 

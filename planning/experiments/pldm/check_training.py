@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check PLDM training completion and native-default configuration."""
+"""Check PLDM training completion and matched-compute configuration."""
 
 from __future__ import annotations
 
@@ -58,8 +58,20 @@ def main() -> None:
         cfg = OmegaConf.load(run_dir / 'config.yaml')
         if int(cfg.wm.history_size) != 1:
             failures.append(f"{row['run_name']}: history is not 1")
-        if int(cfg.trainer.max_epochs) != 100:
-            failures.append(f"{row['run_name']}: max_epochs is not 100")
+        updates_per_epoch = int(
+            cfg.pldm_experiment.get('optimizer_updates_per_epoch', 0)
+        )
+        matched_checks = {
+            'epochs': int(cfg.trainer.max_epochs) == 10,
+            'batch size': int(cfg.loader.batch_size) == 256,
+            'learning rate': float(cfg.optimizer.lr) == 1e-4,
+            'weight decay': float(cfg.optimizer.weight_decay) == 1e-3,
+            'precision': str(cfg.trainer.precision) == 'bf16',
+            'optimizer updates': updates_per_epoch > 0,
+        }
+        for label, passed in matched_checks.items():
+            if not passed:
+                failures.append(f"{row['run_name']}: {label} mismatch")
         if int(cfg.seed) != int(row['seed']):
             failures.append(f"{row['run_name']}: seed mismatch")
 

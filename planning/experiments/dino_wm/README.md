@@ -15,16 +15,23 @@ The experiment uses the DINO-WM implementation in the locked
 - DINO-WM causal predictor and action/state encoders;
 - matched predictor history `H=1`;
 - pure teacher-forcing MSE on the predicted non-action embedding;
-- 10 epochs, batch size 32, AdamW with learning rate `5e-4`;
+- 10 epochs, effective batch size 256, AdamW with learning rate `1e-4` and
+  weight decay `1e-3`;
+- physical batch size 32 with eight-step gradient accumulation, the shared
+  linear-warmup cosine schedule, and `bf16` precision;
 - state and action conditioning where supported, with action-only OGBench-Cube.
 
 DINO-WM ships with `H=3`; only history is changed to `H=1` for the controlled
-main-figure comparison. The architecture, objective, and remaining optimization
-defaults are unchanged.
+main-figure comparison. Its architecture and objective are unchanged; optimization
+uses the shared main-figure protocol.
 
 Every method receives the same full HDF5 training split and held-out validation
 split. Planning uses the same CEM solver, 100 tasks, goal offset 25, budget 50,
 task seeds, and policy seeds as `planning_eval`.
+
+Each epoch is truncated to `8 * floor(N / 256)` micro-batches. After gradient
+accumulation, this gives exactly `floor(N / 256)` optimizer updates, matching the
+main methods without requiring a memory-heavy physical batch of 256.
 
 Outputs remain under this folder:
 
@@ -64,7 +71,8 @@ cd experiments/dino_wm
 RUNS_ROOT=$PWD/results_smoke/train ./train_run.sh pusht_dino_wm_seed0 \
   trainer.max_epochs=1 trainer.strategy=auto \
   +trainer.limit_train_batches=1 +trainer.limit_val_batches=1 \
-  loader.batch_size=2 wandb.enabled=false
+  trainer.accumulate_grad_batches=1 loader.batch_size=2 \
+  optimization_matching.enabled=false wandb.enabled=false
 ```
 
 ## Local

@@ -10,12 +10,14 @@ protocol:
 ## Method
 
 The model and loss code are vendored byte-for-byte from the official
-`stable-worldmodel` PLDM port pinned in `SOURCE.md`. Its architecture,
-optimization, and objective defaults are preserved, except for matched context:
+`stable-worldmodel` PLDM port pinned in `SOURCE.md`. Its architecture and
+objective are preserved under the shared main-figure training protocol:
 
 - ViT-Tiny encoder trained from scratch;
 - predictor history `H=1`, matched to every learned method in the main figure;
-- 100 epochs, batch size 128, AdamW with learning rate `5e-5`;
+- 10 epochs, batch size 256, AdamW with learning rate `1e-4` and weight decay
+  `1e-3`;
+- the shared linear-warmup cosine schedule and `bf16` precision;
 - objective:
   `prediction + 18 std + 0.7 std_t + 12 cov + 0.2 temporal alignment`.
 
@@ -27,6 +29,8 @@ main-figure comparison.
 The only adaptations are experimental controls:
 
 - every method receives the same full HDF5 training split and held-out validation split;
+- PLDM receives exactly the same number of training batches and optimizer updates
+  as the main methods;
 - planning uses the same CEM solver, 100 tasks, goal offset 25, budget 50, and task/policy
   seeds as `planning_eval`;
 - checkpoints use the repository's strict-load format.

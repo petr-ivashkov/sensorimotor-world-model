@@ -162,8 +162,32 @@ def build_loaders(cfg, train_set, val_set):
     return train_loader, val_loader
 
 
+def enforce_matched_update_budget(cfg, train_set):
+    if not bool(cfg.optimization_matching.enabled):
+        return
+
+    micro_batch = int(cfg.loader.batch_size)
+    accumulation = int(cfg.trainer.accumulate_grad_batches)
+    reference_batch = int(cfg.optimization_matching.reference_batch_size)
+    if micro_batch * accumulation != reference_batch:
+        raise ValueError(
+            'Micro-batch times gradient accumulation must equal the '
+            f'reference batch: {micro_batch} * {accumulation} != '
+            f'{reference_batch}'
+        )
+
+    updates_per_epoch = len(train_set) // reference_batch
+    if updates_per_epoch < 1:
+        raise ValueError('Training split is smaller than one reference batch')
+
+    with open_dict(cfg):
+        cfg.trainer.limit_train_batches = updates_per_epoch * accumulation
+        cfg.dino_wm_experiment.optimizer_updates_per_epoch = updates_per_epoch
+
+
 def run(cfg):
     train_set, val_set = build_datasets(cfg)
+    enforce_matched_update_budget(cfg, train_set)
     train_loader, val_loader = build_loaders(cfg, train_set, val_set)
     data_module = spt.data.DataModule(
         train=train_loader,
@@ -178,6 +202,8 @@ def run(cfg):
             'model_opt': {
                 'modules': 'model',
                 'optimizer': dict(cfg.optimizer),
+                'scheduler': 'LinearWarmupCosineAnnealingLR',
+                'interval': 'epoch',
             }
         },
     )

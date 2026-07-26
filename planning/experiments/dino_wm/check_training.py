@@ -51,13 +51,31 @@ def main() -> None:
             continue
 
         cfg = OmegaConf.load(run_dir / 'config.yaml')
+        accumulation = int(cfg.trainer.get('accumulate_grad_batches', 1))
+        updates_per_epoch = int(
+            cfg.dino_wm_experiment.get('optimizer_updates_per_epoch', 0)
+        )
+        train_batch_limit = int(cfg.trainer.get('limit_train_batches', -1))
+        matching = cfg.get('optimization_matching', {})
         checks = {
             'history': int(cfg.wm.history_size) == 1,
             'sequence length': int(cfg.data.dataset.num_steps) == 2,
             'epochs': int(cfg.trainer.max_epochs) == 10,
             'batch size': int(cfg.loader.batch_size) == 32,
-            'learning rate': float(cfg.optimizer.lr) == 5e-4,
-            'weight decay': float(cfg.optimizer.weight_decay) == 0.0,
+            'gradient accumulation': accumulation == 8,
+            'effective batch size': (
+                int(cfg.loader.batch_size) * accumulation == 256
+            ),
+            'learning rate': float(cfg.optimizer.lr) == 1e-4,
+            'weight decay': float(cfg.optimizer.weight_decay) == 1e-3,
+            'precision': str(cfg.trainer.precision) == 'bf16',
+            'matching enabled': bool(matching.get('enabled', False)),
+            'reference batch size': int(
+                matching.get('reference_batch_size', 0)
+            ) == 256,
+            'optimizer updates': updates_per_epoch > 0,
+            'exact update limit': train_batch_limit
+            == accumulation * updates_per_epoch,
             'seed': int(cfg.seed) == int(row['seed']),
             'backbone': str(cfg.backbone.name) == row['backbone'],
             'backbone revision': str(cfg.backbone.revision)

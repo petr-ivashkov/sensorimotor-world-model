@@ -15,8 +15,9 @@ The port cites the original PLDM implementation:
 - inspected commit: `1bd7e564ecd961205bc18b23067b19e9ca24ac90`
 
 The training adapter preserves the shipped PLDM model and default objective. It
-replaces dataset/checkpoint plumbing and sets predictor history to `H=1` to match
-every learned method in the main planning figure.
+replaces dataset/checkpoint plumbing, sets predictor history to `H=1`, and uses
+the shared 10-epoch, effective-batch-256 optimization protocol to match every
+learned method in the main planning figure.
 
 Default active loss:
 
