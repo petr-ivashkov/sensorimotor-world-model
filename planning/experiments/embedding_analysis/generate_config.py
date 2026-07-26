@@ -18,28 +18,28 @@ ENV_SPECS = [
         "slug": "tworoom",
         "run_stem": "tworoom",
         "dataset_stem": "tworoom",
-        "inverse_pattern": "tworoom_inverse_lambda_*_seed0",
+        "inverse_pattern": "tworoom_inverse_lambda_10_seed0",
     },
     {
         "name": "Reacher",
         "slug": "reacher",
         "run_stem": "reacher",
         "dataset_stem": "reacher",
-        "inverse_pattern": "reacher_inverse_lambda_1_seed0",
+        "inverse_pattern": "reacher_inverse_lambda_10_seed0",
     },
     {
         "name": "Push-T",
         "slug": "pusht",
         "run_stem": "pusht",
         "dataset_stem": "pusht_expert",
-        "inverse_pattern": "pusht_inverse_lambda_*_seed0",
+        "inverse_pattern": "pusht_inverse_lambda_10_seed0",
     },
     {
         "name": "OGBench-Cube",
         "slug": "ogbcube",
         "run_stem": "cube",
         "dataset_stem": "cube_single_expert",
-        "inverse_pattern": "cube_inverse_lambda_*_seed0",
+        "inverse_pattern": "cube_inverse_lambda_10_seed0",
     },
 ]
 
