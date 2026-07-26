@@ -86,6 +86,7 @@ def aggregate(exp_dir: Path) -> list[dict[str, str]]:
                 "result_dir": str(result_dir),
                 "metrics_path": str(metrics_path),
                 "final_training_run": row["final_training_run"],
+                "inverse_weight": row["inverse_weight"],
             }
         )
     return out_rows
@@ -110,6 +111,7 @@ def write_csv(rows: list[dict[str, str]], out_path: Path) -> None:
         "result_dir",
         "metrics_path",
         "final_training_run",
+        "inverse_weight",
     ]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", newline="", encoding="utf-8") as f:

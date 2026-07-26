@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 
 
 EXPERIMENT_NAME = "train"
+INVERSE_WEIGHT = 10.0
 SIGREG_WEIGHT = 0.09
 SEEDS = (0, 1, 2, 3, 4)
 
@@ -20,17 +21,13 @@ class Environment:
     label: str
     config_name: str
     run_prefix: str
-    inverse_weight: float
-    inverse_name_weight: float | None = None
 
 
 ENVIRONMENTS = (
-    Environment("TwoRoom", "tworoom", "tworoom", 0.1),
-    # Keep the legacy lambda_1 run names so this targeted correction overwrites
-    # the existing Reacher inverse outputs, but train them with lambda=5.
-    Environment("Reacher", "reacher", "reacher", 5.0, inverse_name_weight=1.0),
-    Environment("Push-T", "pusht", "pusht", 30.0),
-    Environment("OGBench-Cube", "ogbcube", "cube", 1.0),
+    Environment("TwoRoom", "tworoom", "tworoom"),
+    Environment("Reacher", "reacher", "reacher"),
+    Environment("Push-T", "pusht", "pusht"),
+    Environment("OGBench-Cube", "ogbcube", "cube"),
 )
 
 
@@ -55,21 +52,16 @@ def weight_label(value: float) -> str:
 
 def run_name(env: Environment, method: Method, seed: int) -> str:
     if method.slug == "inverse":
-        name_weight = (
-            env.inverse_weight
-            if env.inverse_name_weight is None
-            else env.inverse_name_weight
-        )
         return (
             f"{env.run_prefix}_inverse_lambda_"
-            f"{weight_label(name_weight)}_seed{seed}"
+            f"{weight_label(INVERSE_WEIGHT)}_seed{seed}"
         )
     return f"{env.run_prefix}_{method.slug}_seed{seed}"
 
 
 def config_for_run(env: Environment, method: Method, seed: int) -> dict:
     inverse_weight = (
-        env.inverse_weight if method.inverse_weight is None else method.inverse_weight
+        INVERSE_WEIGHT if method.inverse_weight is None else method.inverse_weight
     )
     name = run_name(env, method, seed)
     return {
@@ -116,6 +108,8 @@ def config_for_run(env: Environment, method: Method, seed: int) -> dict:
             "environment": env.label,
             "method": method.name,
             "seed": seed,
+            "inverse_weight": inverse_weight,
+            "sigreg_weight": method.sigreg_weight,
         },
     }
 
@@ -173,6 +167,8 @@ def write_manifest(rows: list[tuple[str, ...]], output_dir: Path) -> None:
         "\n".join("\t".join(row) for row in (header, *rows)) + "\n",
         encoding="utf-8",
     )
+    run_names = "\n".join(row[0] for row in rows) + "\n"
+    (output_dir / "train_queue.txt").write_text(run_names, encoding="utf-8")
 
 
 def main() -> None:

@@ -8,10 +8,12 @@ Goal-conditioned planning success for the trained models:
 
 - **Methods:** `inverse` (ours), `forward_only`, `sigreg`, `random`
 - **Fixed settings:** `num_eval=100`, `goal_offset_steps=25`, `eval_budget=50`
+- **IDR weight:** fixed `lambda=10` for every environment
 
 Learned methods load checkpoints from `experiments/train/results/<run_name>/` (run the
 `train` stage first). Random jobs set `policy: random` and load no checkpoint. For each
 environment, every method/seed evaluates on the same 100 start–goal pairs.
+Config generation rejects a training manifest containing any non-10 IDR run.
 
 ## Run
 

@@ -13,6 +13,7 @@ from omegaconf import OmegaConf
 
 EXPERIMENT_NAME = "horizon_sweep"
 TRAINING_EXPERIMENT = "train"
+INVERSE_WEIGHT = 10.0
 SEED = 0
 GOAL_BUDGET_PAIRS = (
     (25, 50),
@@ -68,6 +69,13 @@ def load_training_manifest(path: Path) -> dict[tuple[str, str, int], str]:
             key = (row["environment"], row["method"], int(row["seed"]))
             if key in runs:
                 raise ValueError(f"Duplicate final-training manifest key: {key}")
+            if row["method"] == "inverse":
+                observed = float(row.get("inverse_weight", "nan"))
+                if observed != INVERSE_WEIGHT:
+                    raise ValueError(
+                        f"{row['run_name']}: expected inverse weight "
+                        f"{INVERSE_WEIGHT:g}, found {observed:g}"
+                    )
             runs[key] = row["run_name"]
     return runs
 
@@ -97,6 +105,9 @@ def config_for_job(
     label = offset_label(goal_offset)
     job_name = f"{env.slug}_{method}_{label}"
     is_random = method == "random"
+    inverse_weight = None if is_random else (
+        INVERSE_WEIGHT if method == "inverse" else 0.0
+    )
 
     run: dict[str, object] = {"name": label}
     final_training_run = None
@@ -143,6 +154,7 @@ def config_for_job(
             "run_label": label,
             "result_dir": f"results/{env.slug}/{method}/{label}",
             "final_training_run": final_training_run,
+            "inverse_weight": inverse_weight,
         },
     }
     return job_name, cfg
@@ -195,6 +207,11 @@ def generate(output_dir: Path, selected_job: str | None = None) -> list[dict[str
                         "config_path": str(config_path),
                         "dataset_file": env.dataset_file,
                         "final_training_run": str(metadata["final_training_run"] or ""),
+                        "inverse_weight": str(
+                            metadata["inverse_weight"]
+                            if metadata["inverse_weight"] is not None
+                            else ""
+                        ),
                     }
                 )
 
@@ -222,6 +239,7 @@ def write_manifest(rows: list[dict[str, str]], output_dir: Path) -> None:
         "config_path",
         "dataset_file",
         "final_training_run",
+        "inverse_weight",
     ]
     with (output_dir / "manifest.tsv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter="\t")

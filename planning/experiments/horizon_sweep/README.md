@@ -15,6 +15,8 @@ Goal offsets are paired elementwise with the evaluation budget (`budget = 2 x of
 Each job evaluates 100 tasks; for a fixed environment and offset all methods share the same
 start–goal pairs. Learned methods load `experiments/train/results/<run_name>/` (run the
 `train` stage first).
+IDR uses the fixed `lambda=10` checkpoint in every environment; config generation rejects
+any training manifest containing a non-10 IDR run.
 
 ## Run
 

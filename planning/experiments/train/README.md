@@ -16,10 +16,10 @@ Configs inherit from `config/train/base.yaml` and `config/train/data/<env>.yaml`
 method weights, seed, run name, and one-frame settings (`wm.history_size=1`,
 `data.dataset.num_steps=2`) are varied.
 
-Inverse-dynamics weights (paper Table 1):
+The inverse-dynamics weight is fixed across environments:
 
 ```text
-TwoRoom: 0.1   Reacher: 5   Push-T: 30   OGBench-Cube: 1
+TwoRoom: 10   Reacher: 10   Push-T: 10   OGBench-Cube: 10
 ```
 
 ## Run
@@ -27,10 +27,16 @@ TwoRoom: 0.1   Reacher: 5   Push-T: 30   OGBench-Cube: 1
 ```bash
 # 1. Generate the per-run configs + manifest
 cd experiments/train
-python generate_configs.py        # writes generated_configs/*.yaml and manifest.tsv
+python generate_configs.py        # writes configs, manifest.tsv, and train_queue.txt
 
-# 2. Train one run (repeat for each run name in the manifest)
-./run.sh tworoom_inverse_lambda_0p1_seed0
+# 2. Train one run
+./run.sh tworoom_inverse_lambda_10_seed0
+
+# Or submit all 60 runs
+condor_submit_bid 100 train.sub
+
+# 3. Require all 60 matched runs before evaluation
+python check_training.py
 ```
 
 `run.sh <run_name>` activates the project venv, resolves data roots, and launches `train.py`
