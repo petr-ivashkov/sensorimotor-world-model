@@ -18,9 +18,23 @@ import eval as shared_eval
 from model import build_dino_wm
 
 
+EXPECTED_PROTOCOL = 'matched_batch256_mean_accumulation_v2'
+
+
 def load_dino_wm_from_run(run_dir: Path, device: str = 'cuda'):
     run_dir = Path(run_dir)
     train_cfg = OmegaConf.load(run_dir / 'config.yaml')
+    protocol = str(
+        train_cfg.get('optimization_matching', {}).get(
+            'protocol_version',
+            '',
+        )
+    )
+    if protocol != EXPECTED_PROTOCOL:
+        raise RuntimeError(
+            f'Checkpoint uses DINO-WM protocol {protocol!r}; expected '
+            f'{EXPECTED_PROTOCOL!r}'
+        )
     model = build_dino_wm(train_cfg)
     checkpoint = torch.load(
         run_dir / 'checkpoints' / 'last.ckpt',

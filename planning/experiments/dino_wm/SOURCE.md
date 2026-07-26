@@ -30,7 +30,10 @@ The Hugging Face backbone is pinned to revision
 Adaptations are limited to the controlled comparison:
 
 - `H=1` rather than DINO-WM's native `H=3`;
-- the shared 10-epoch, effective-batch-256 optimization protocol;
+- the shared 10-epoch, effective-batch-256 optimization protocol, implemented
+  as eight mean-reduced micro-batches of 32;
+- the shared optimizer-update-indexed learning-rate, validation, and logging
+  schedules;
 - the same full HDF5 training split and held-out validation split;
 - the same CEM planner, tasks, seeds, and evaluation budget as `planning_eval`;
 - repository-standard strict checkpoints.

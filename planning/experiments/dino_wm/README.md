@@ -17,8 +17,8 @@ The experiment uses the DINO-WM implementation in the locked
 - pure teacher-forcing MSE on the predicted non-action embedding;
 - 10 epochs, effective batch size 256, AdamW with learning rate `1e-4` and
   weight decay `1e-3`;
-- physical batch size 32 with eight-step gradient accumulation, the shared
-  linear-warmup cosine schedule, and `bf16` precision;
+- physical batch size 32 with eight-step mean-gradient accumulation, the shared
+  optimizer-update-indexed linear-warmup cosine schedule, and `bf16` precision;
 - state and action conditioning where supported, with action-only OGBench-Cube.
 
 DINO-WM ships with `H=3`; only history is changed to `H=1` for the controlled
@@ -31,7 +31,14 @@ task seeds, and policy seeds as `planning_eval`.
 
 Each epoch is truncated to `8 * floor(N / 256)` micro-batches. After gradient
 accumulation, this gives exactly `floor(N / 256)` optimizer updates, matching the
-main methods without requiring a memory-heavy physical batch of 256.
+main methods without requiring a memory-heavy physical batch of 256. Each
+micro-batch loss is divided by eight before backward, so one accumulated update
+equals the mean loss over 256 examples. Gradient clipping and the learning-rate
+scheduler run once per optimizer update.
+
+Validation and logging intervals are scaled by eight so they occur after the
+same number of optimizer updates and examples as in the main training pipeline.
+The loader uses the shared 24 workers and prefetch factor 4.
 
 Outputs remain under this folder:
 
@@ -52,7 +59,7 @@ mkdir -p logs
 
 condor_submit_bid 100 train.sub
 
-# Run only after training finishes; this must print 20/20.
+# Run only after training finishes; this validates configs and checkpoint state.
 python check_training.py
 
 condor_submit_bid 100 eval.sub
@@ -69,11 +76,15 @@ Single-run smoke test:
 ```bash
 cd experiments/dino_wm
 RUNS_ROOT=$PWD/results_smoke/train ./train_run.sh pusht_dino_wm_seed0 \
-  trainer.max_epochs=1 trainer.strategy=auto \
-  +trainer.limit_train_batches=1 +trainer.limit_val_batches=1 \
+  trainer.max_epochs=1 +trainer.limit_train_batches=2 \
+  trainer.val_check_interval=1 \
+  trainer.limit_val_batches=1 trainer.log_every_n_steps=1 \
   trainer.accumulate_grad_batches=1 loader.batch_size=2 \
   optimization_matching.enabled=false wandb.enabled=false
 ```
+
+Do not evaluate checkpoints whose saved config lacks protocol
+`matched_batch256_mean_accumulation_v2`.
 
 ## Local
 

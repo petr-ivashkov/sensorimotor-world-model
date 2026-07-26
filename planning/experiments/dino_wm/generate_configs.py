@@ -14,6 +14,7 @@ from omegaconf import OmegaConf
 METHOD = 'dino_wm'
 BACKBONE = 'facebook/dinov2-small'
 BACKBONE_REVISION = 'ed25f3a31f01632728cabb09d1542f84ab7b0056'
+PROTOCOL_VERSION = 'matched_batch256_mean_accumulation_v2'
 HISTORY = 1
 SEEDS = (0, 1, 2, 3, 4)
 MAX_EPOCHS = 10
@@ -22,6 +23,11 @@ MICRO_BATCH_SIZE = 32
 GRAD_ACCUMULATION_STEPS = REFERENCE_BATCH_SIZE // MICRO_BATCH_SIZE
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-3
+NUM_WORKERS = 24
+PREFETCH_FACTOR = 4
+VALIDATION_INTERVAL_UPDATES = 500
+VALIDATION_BATCHES_AT_REFERENCE_BATCH = 10
+LOG_INTERVAL_UPDATES = 25
 
 NUM_EVAL = 100
 GOAL_OFFSET_STEPS = 25
@@ -115,7 +121,7 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
         'seed': seed,
         'image_size': 224,
         'patch_size': 14,
-        'num_workers': 16,
+        'num_workers': NUM_WORKERS,
         'backbone': {
             'name': BACKBONE,
             'revision': BACKBONE_REVISION,
@@ -143,25 +149,45 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
         },
         'trainer': {
             'max_epochs': MAX_EPOCHS,
-            'strategy': 'ddp',
+            'strategy': 'auto',
             'devices': 'auto',
             'accelerator': 'gpu',
             'precision': 'bf16',
             'gradient_clip_val': 1.0,
             'accumulate_grad_batches': GRAD_ACCUMULATION_STEPS,
+            'val_check_interval': (
+                VALIDATION_INTERVAL_UPDATES * GRAD_ACCUMULATION_STEPS
+            ),
+            'limit_val_batches': (
+                VALIDATION_BATCHES_AT_REFERENCE_BATCH
+                * GRAD_ACCUMULATION_STEPS
+            ),
+            'log_every_n_steps': (
+                LOG_INTERVAL_UPDATES * GRAD_ACCUMULATION_STEPS
+            ),
         },
         'loader': {
             'batch_size': MICRO_BATCH_SIZE,
             'num_workers': '${num_workers}',
             'drop_last': True,
             'persistent_workers': True,
+            'prefetch_factor': PREFETCH_FACTOR,
             'pin_memory': True,
             'shuffle': True,
         },
         'data': {'dataset': {'num_steps': HISTORY + 1}},
         'optimization_matching': {
             'enabled': True,
+            'protocol_version': PROTOCOL_VERSION,
             'reference_batch_size': REFERENCE_BATCH_SIZE,
+            'micro_batch_size': MICRO_BATCH_SIZE,
+            'accumulation_steps': GRAD_ACCUMULATION_STEPS,
+            'gradient_reduction': 'mean',
+            'validation_interval_updates': VALIDATION_INTERVAL_UPDATES,
+            'validation_batches_at_reference_batch': (
+                VALIDATION_BATCHES_AT_REFERENCE_BATCH
+            ),
+            'log_interval_updates': LOG_INTERVAL_UPDATES,
         },
         'artifacts': {'use_external_callbacks': False},
         'wandb': {
@@ -258,6 +284,11 @@ def generate(output_dir: Path) -> list[dict[str, str]]:
                     'history': str(HISTORY),
                     'backbone': BACKBONE,
                     'backbone_revision': BACKBONE_REVISION,
+                    'protocol_version': PROTOCOL_VERSION,
+                    'reference_batch_size': str(REFERENCE_BATCH_SIZE),
+                    'micro_batch_size': str(MICRO_BATCH_SIZE),
+                    'accumulation_steps': str(GRAD_ACCUMULATION_STEPS),
+                    'gradient_reduction': 'mean',
                     'state_key': env.state_key or '',
                     'train_result_dir': f'results/train/{name}',
                     'eval_result_dir': (

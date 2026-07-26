@@ -73,6 +73,11 @@ def aggregate(exp_dir: Path) -> list[dict[str, str]]:
                 'history': row['history'],
                 'backbone': row['backbone'],
                 'backbone_revision': row['backbone_revision'],
+                'protocol_version': row['protocol_version'],
+                'reference_batch_size': row['reference_batch_size'],
+                'micro_batch_size': row['micro_batch_size'],
+                'accumulation_steps': row['accumulation_steps'],
+                'gradient_reduction': row['gradient_reduction'],
                 'state_key': row['state_key'],
                 'success_rate': str(
                     pick_metric(metrics, METRIC_ALIASES['success_rate'])
