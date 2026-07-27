@@ -296,7 +296,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=Path(__file__).with_name("config.yaml"))
     parser.add_argument("--env", help="Optional environment name/slug.")
-    parser.add_argument("--method", help="Optional method name: inverse, sigreg, forward_only.")
+    parser.add_argument(
+        "--method",
+        help="Optional method name: inverse, sigreg, forward_only, idr_sigreg.",
+    )
     parser.add_argument("--output-root", help="Override config output_root.")
     parser.add_argument("--batch-size", type=int, help="Override config batch_size.")
     parser.add_argument("--device", help="Override config device.")

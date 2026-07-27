@@ -113,7 +113,7 @@ def finite(values: list[object]) -> list[float]:
     return [value for value in parsed if math.isfinite(value)]
 
 
-def mean_sem(values: list[object]) -> tuple[float, float, int]:
+def mean_std(values: list[object]) -> tuple[float, float, int]:
     values_finite = finite(values)
     n = len(values_finite)
     if not values_finite:
@@ -122,7 +122,7 @@ def mean_sem(values: list[object]) -> tuple[float, float, int]:
     if n == 1:
         return mean, 0.0, 1
     variance = sum((value - mean) ** 2 for value in values_finite) / (n - 1)
-    return mean, math.sqrt(variance / n), n
+    return mean, math.sqrt(variance), n
 
 
 def summarize(rows: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -145,9 +145,9 @@ def summarize(rows: list[dict[str, object]]) -> list[dict[str, object]]:
             "lambda_label": lambda_label,
         }
         for metric in SUMMARY_METRICS:
-            mean, sem, n = mean_sem([row[metric] for row in group])
+            mean, std, n = mean_std([row[metric] for row in group])
             result[f"{metric}_mean"] = mean
-            result[f"{metric}_sem"] = sem
+            result[f"{metric}_std"] = std
             result[f"{metric}_n"] = n
         summary.append(result)
     return summary

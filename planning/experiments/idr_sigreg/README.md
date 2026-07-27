@@ -45,7 +45,7 @@ jupyter nbconvert --to notebook --execute --inplace plot_results.ipynb
 ```
 
 Lightning training output is written to `logs/condor.train.*.err`.
-Aggregation writes the 20-run table and combined-only mean/SEM table; the notebook writes
+Aggregation writes the 20-run table and combined-only mean/STD table; the notebook writes
 the exact-control comparison table and figure.
 
 Single-run smoke test:

@@ -60,6 +60,12 @@ METHOD_SPECS = [
         "label": "forward-only",
         "pattern": "{run_stem}_forward_only_seed0",
     },
+    {
+        "name": "idr_sigreg",
+        "label": "IDR+SIGReg",
+        "pattern": "{slug}_idr_sigreg_seed0",
+        "results_source": "idr_sigreg",
+    },
 ]
 
 
@@ -88,7 +94,12 @@ def run_dir_ref(path: Path) -> str:
         return str(abs_path)
 
 
-def build_config(results_dir: Path, train_suffix: str, eval_suffix: str) -> dict:
+def build_config(
+    results_dir: Path,
+    idr_sigreg_results_dir: Path,
+    train_suffix: str,
+    eval_suffix: str,
+) -> dict:
     environments = []
     for env_spec in ENV_SPECS:
         slug = env_spec["slug"]
@@ -100,7 +111,12 @@ def build_config(results_dir: Path, train_suffix: str, eval_suffix: str) -> dict
                 run_pattern = env_spec[pattern]
             else:
                 run_pattern = method_spec["pattern"].format(**env_spec)
-            run_dir = find_one(results_dir, run_pattern)
+            method_results_dir = (
+                idr_sigreg_results_dir
+                if method_spec.get("results_source") == "idr_sigreg"
+                else results_dir
+            )
+            run_dir = find_one(method_results_dir, run_pattern)
             methods.append(
                 {
                     "name": method_spec["name"],
@@ -151,6 +167,11 @@ def main() -> int:
         type=Path,
         default=EXPERIMENT_DIR / "config.yaml",
     )
+    parser.add_argument(
+        "--idr-sigreg-results-dir",
+        type=Path,
+        default=REPO_ROOT / "experiments" / "idr_sigreg" / "results" / "train",
+    )
     parser.add_argument("--train-suffix", default="25k")
     parser.add_argument("--eval-suffix", default="5k")
     parser.add_argument("--overwrite", action="store_true")
@@ -159,7 +180,12 @@ def main() -> int:
     if args.output.exists() and not args.overwrite:
         raise SystemExit(f"{args.output} already exists; pass --overwrite to replace it.")
 
-    cfg = build_config(Path(os.path.abspath(args.results_dir)), args.train_suffix, args.eval_suffix)
+    cfg = build_config(
+        Path(os.path.abspath(args.results_dir)),
+        Path(os.path.abspath(args.idr_sigreg_results_dir)),
+        args.train_suffix,
+        args.eval_suffix,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     OmegaConf.save(config=OmegaConf.create(cfg), f=args.output)
     print(f"Wrote {args.output}")

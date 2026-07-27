@@ -28,7 +28,7 @@ eval_run.sh  <run_name>  # activate env, launch eval.py  for one checkpoint
 train.sub  eval.sub      # HTCondor: queue over generated_configs/{train,eval}_queue.txt
 aggregate_results.py     # eval metrics.json -> aggregated_results.csv
 diagnostics.ipynb        # per-run training curves + completion / collapse checks
-plot_results.ipynb       # grouped success bars + final mean±SEM table
+plot_results.ipynb       # grouped success bars + final mean±STD table
 ```
 
 Outputs land in `results/train/<run_name>/` and `results/eval/<run_name>/` (both gitignored).

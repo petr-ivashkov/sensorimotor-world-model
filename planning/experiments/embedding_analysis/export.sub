@@ -11,19 +11,11 @@ request_memory = $(memory_mb)
 request_gpus = 1
 requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
 
-# Embedding export: 4 environments x 3 methods x seed 0 = 12 jobs.
+# New embedding exports only: 4 environments x IDR+SIGReg x seed 0 = 4 jobs.
 # Run `python generate_config.py --overwrite` once before submitting.
 queue env_name,method from (
-tworoom inverse
-tworoom sigreg
-tworoom forward_only
-reacher inverse
-reacher sigreg
-reacher forward_only
-pusht inverse
-pusht sigreg
-pusht forward_only
-ogbcube inverse
-ogbcube sigreg
-ogbcube forward_only
+tworoom idr_sigreg
+reacher idr_sigreg
+pusht idr_sigreg
+ogbcube idr_sigreg
 )

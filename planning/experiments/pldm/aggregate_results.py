@@ -104,18 +104,14 @@ def summarize(rows: list[dict[str, str]]) -> list[dict[str, str]]:
 
     summary: list[dict[str, str]] = []
     for (env, env_label, method), values in grouped.items():
-        sem = (
-            statistics.stdev(values) / math.sqrt(len(values))
-            if len(values) > 1
-            else math.nan
-        )
+        std = statistics.stdev(values) if len(values) > 1 else math.nan
         summary.append(
             {
                 'env': env,
                 'env_label': env_label,
                 'method': method,
                 'mean': str(statistics.mean(values)),
-                'sem': str(sem),
+                'std': str(std),
                 'n': str(len(values)),
             }
         )
