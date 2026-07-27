@@ -1,0 +1,101 @@
+env_label,display_method,repeat,success_rate
+TwoRoom,Forward only,0,41.0
+TwoRoom,Forward only,1,34.0
+TwoRoom,Forward only,2,28.000000000000004
+TwoRoom,Forward only,3,28.999999999999996
+TwoRoom,Forward only,4,43.0
+TwoRoom,IDR,0,97.0
+TwoRoom,IDR,1,98.0
+TwoRoom,IDR,2,97.0
+TwoRoom,IDR,3,96.0
+TwoRoom,IDR,4,96.0
+TwoRoom,SIGReg,0,94.0
+TwoRoom,SIGReg,1,94.0
+TwoRoom,SIGReg,2,94.0
+TwoRoom,SIGReg,3,95.0
+TwoRoom,SIGReg,4,95.0
+TwoRoom,Random,0,33.0
+TwoRoom,Random,1,28.000000000000004
+TwoRoom,Random,2,23.0
+TwoRoom,Random,3,28.000000000000004
+TwoRoom,Random,4,38.0
+Reacher,Forward only,0,8.0
+Reacher,Forward only,1,7.000000000000001
+Reacher,Forward only,2,6.0
+Reacher,Forward only,3,11.0
+Reacher,Forward only,4,6.0
+Reacher,IDR,0,66.0
+Reacher,IDR,1,71.0
+Reacher,IDR,2,73.0
+Reacher,IDR,3,65.0
+Reacher,IDR,4,67.0
+Reacher,SIGReg,0,69.0
+Reacher,SIGReg,1,72.0
+Reacher,SIGReg,2,70.0
+Reacher,SIGReg,3,68.0
+Reacher,SIGReg,4,67.0
+Reacher,Random,0,9.0
+Reacher,Random,1,22.0
+Reacher,Random,2,14.000000000000002
+Reacher,Random,3,10.0
+Reacher,Random,4,13.0
+Push-T,Forward only,0,1.0
+Push-T,Forward only,1,4.0
+Push-T,Forward only,2,1.0
+Push-T,Forward only,3,2.0
+Push-T,Forward only,4,1.0
+Push-T,IDR,0,85.0
+Push-T,IDR,1,85.0
+Push-T,IDR,2,82.0
+Push-T,IDR,3,85.0
+Push-T,IDR,4,81.0
+Push-T,SIGReg,0,88.0
+Push-T,SIGReg,1,92.0
+Push-T,SIGReg,2,90.0
+Push-T,SIGReg,3,89.0
+Push-T,SIGReg,4,90.0
+Push-T,Random,0,1.0
+Push-T,Random,1,2.0
+Push-T,Random,2,5.0
+Push-T,Random,3,3.0
+Push-T,Random,4,3.0
+OGBench-Cube,Forward only,0,43.0
+OGBench-Cube,Forward only,1,42.0
+OGBench-Cube,Forward only,2,44.0
+OGBench-Cube,Forward only,3,45.0
+OGBench-Cube,Forward only,4,45.0
+OGBench-Cube,IDR,0,84.0
+OGBench-Cube,IDR,1,75.0
+OGBench-Cube,IDR,2,82.0
+OGBench-Cube,IDR,3,79.0
+OGBench-Cube,IDR,4,83.0
+OGBench-Cube,SIGReg,0,65.0
+OGBench-Cube,SIGReg,1,57.99999999999999
+OGBench-Cube,SIGReg,2,56.00000000000001
+OGBench-Cube,SIGReg,3,59.0
+OGBench-Cube,SIGReg,4,57.99999999999999
+OGBench-Cube,Random,0,43.0
+OGBench-Cube,Random,1,40.0
+OGBench-Cube,Random,2,44.0
+OGBench-Cube,Random,3,45.0
+OGBench-Cube,Random,4,43.0
+TwoRoom,PLDM,0,99.0
+TwoRoom,PLDM,1,99.0
+TwoRoom,PLDM,2,99.0
+TwoRoom,PLDM,3,99.0
+TwoRoom,PLDM,4,100.0
+Reacher,PLDM,0,73.0
+Reacher,PLDM,1,69.0
+Reacher,PLDM,2,72.0
+Reacher,PLDM,3,56.99999999999999
+Reacher,PLDM,4,70.0
+Push-T,PLDM,0,72.0
+Push-T,PLDM,1,70.0
+Push-T,PLDM,2,67.0
+Push-T,PLDM,3,71.0
+Push-T,PLDM,4,72.0
+OGBench-Cube,PLDM,0,56.00000000000001
+OGBench-Cube,PLDM,1,56.00000000000001
+OGBench-Cube,PLDM,2,56.99999999999999
+OGBench-Cube,PLDM,3,59.0
+OGBench-Cube,PLDM,4,63.0

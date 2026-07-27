@@ -23,6 +23,7 @@ sys.path.insert(0, str(REPO_ROOT))
 os.environ.setdefault('REPO_ROOT', str(REPO_ROOT))
 
 from model import build_dino_wm
+from protocol import validate_input_protocol
 from utils import get_column_normalizer
 
 
@@ -309,6 +310,7 @@ def matched_scheduler_config(cfg):
 
 
 def run(cfg):
+    validate_input_protocol(cfg)
     train_set, val_set = build_datasets(cfg)
     matched_runtime = enforce_matched_update_budget(cfg, train_set)
     train_loader, val_loader = build_loaders(cfg, train_set, val_set)

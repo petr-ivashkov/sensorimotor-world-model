@@ -10,11 +10,18 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
+from protocol import (
+    EXPECTED_ENCODING,
+    INPUT_PROTOCOL,
+    METHOD,
+    PROTOCOL_VERSION,
+    RESULT_GROUP,
+    VARIANT,
+    validate_input_protocol,
+)
 
-METHOD = 'dino_wm'
 BACKBONE = 'facebook/dinov2-small'
 BACKBONE_REVISION = 'ed25f3a31f01632728cabb09d1542f84ab7b0056'
-PROTOCOL_VERSION = 'matched_batch256_mean_accumulation_v2'
 HISTORY = 1
 SEEDS = (0, 1, 2, 3, 4)
 MAX_EPOCHS = 10
@@ -43,7 +50,6 @@ class Environment:
     data_config: str
     eval_config: str
     dataset_file: str
-    state_key: str | None
 
 
 ENVIRONMENTS = (
@@ -53,7 +59,6 @@ ENVIRONMENTS = (
         'tworoom',
         'tworoom',
         'tworoom_eval.h5',
-        'proprio',
     ),
     Environment(
         'Reacher',
@@ -61,7 +66,6 @@ ENVIRONMENTS = (
         'reacher',
         'reacher',
         'reacher_eval.h5',
-        'observation',
     ),
     Environment(
         'Push-T',
@@ -69,7 +73,6 @@ ENVIRONMENTS = (
         'pusht',
         'pusht',
         'pusht_expert_eval.h5',
-        'proprio',
     ),
     Environment(
         'OGBench-Cube',
@@ -77,13 +80,12 @@ ENVIRONMENTS = (
         'ogbcube',
         'ogbcube',
         'cube_single_expert_eval.h5',
-        None,
     ),
 )
 
 
 def run_name(env: Environment, seed: int) -> str:
-    return f'{env.slug}_{METHOD}_seed{seed}'
+    return f'{env.slug}_{RESULT_GROUP}_seed{seed}'
 
 
 def task_seed(env_idx: int) -> int:
@@ -92,14 +94,6 @@ def task_seed(env_idx: int) -> int:
 
 def policy_seed(env_idx: int, seed: int) -> int:
     return BASE_POLICY_SEED + 1000 * env_idx + seed
-
-
-def encoding_config(env: Environment) -> dict[str, int]:
-    encoding = {}
-    if env.state_key is not None:
-        encoding[env.state_key] = 10
-    encoding['action'] = 10
-    return encoding
 
 
 def train_config(env: Environment, seed: int) -> dict[str, object]:
@@ -131,7 +125,7 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
         'wm': {
             'history_size': HISTORY,
             'num_preds': 1,
-            'encoding': encoding_config(env),
+            'encoding': dict(EXPECTED_ENCODING),
         },
         'predictor': {
             'size': 'small',
@@ -194,7 +188,7 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
             'enabled': True,
             'config': {
                 'project': 'sensorimotor-world-model',
-                'name': f'dino_wm_{name}',
+                'name': name,
                 'resume': 'never',
                 'log_model': False,
             },
@@ -202,11 +196,13 @@ def train_config(env: Environment, seed: int) -> dict[str, object]:
         'dino_wm_experiment': {
             'environment': env.label,
             'method': METHOD,
+            'variant': VARIANT,
             'history': HISTORY,
             'seed': seed,
             'backbone': BACKBONE,
             'backbone_revision': BACKBONE_REVISION,
-            'state_key': env.state_key,
+            'input_protocol': INPUT_PROTOCOL,
+            'uses_privileged_state': False,
             'matched_full_training_split': True,
             'matched_max_epochs': MAX_EPOCHS,
             'matched_effective_batch_size': REFERENCE_BATCH_SIZE,
@@ -248,13 +244,16 @@ def eval_config(
         'dino_wm_experiment': {
             'environment': env.label,
             'method': METHOD,
+            'variant': VARIANT,
             'history': HISTORY,
             'seed': seed,
             'task_seed': task_seed(env_idx),
             'policy_seed': policy_seed(env_idx, seed),
             'backbone': BACKBONE,
             'backbone_revision': BACKBONE_REVISION,
-            'state_key': env.state_key,
+            'input_protocol': INPUT_PROTOCOL,
+            'uses_privileged_state': False,
+            'protocol_version': PROTOCOL_VERSION,
         },
     }
 
@@ -264,6 +263,9 @@ def generate(output_dir: Path) -> list[dict[str, str]]:
     eval_dir = output_dir / 'eval'
     train_dir.mkdir(parents=True, exist_ok=True)
     eval_dir.mkdir(parents=True, exist_ok=True)
+    for config_dir in (train_dir, eval_dir):
+        for path in config_dir.glob('*.yaml'):
+            path.unlink()
 
     rows: list[dict[str, str]] = []
     for env_idx, env in enumerate(ENVIRONMENTS):
@@ -271,6 +273,7 @@ def generate(output_dir: Path) -> list[dict[str, str]]:
             name = run_name(env, seed)
             train_cfg = train_config(env, seed)
             eval_cfg = eval_config(env, env_idx, seed)
+            validate_input_protocol(OmegaConf.create(train_cfg))
             OmegaConf.save(train_cfg, train_dir / f'{name}.yaml')
             OmegaConf.save(eval_cfg, eval_dir / f'{name}.yaml')
             rows.append(
@@ -279,6 +282,8 @@ def generate(output_dir: Path) -> list[dict[str, str]]:
                     'env': env.slug,
                     'env_label': env.label,
                     'method': METHOD,
+                    'variant': VARIANT,
+                    'result_group': RESULT_GROUP,
                     'seed': str(seed),
                     'run_label': f'seed_{seed}',
                     'history': str(HISTORY),
@@ -289,10 +294,12 @@ def generate(output_dir: Path) -> list[dict[str, str]]:
                     'micro_batch_size': str(MICRO_BATCH_SIZE),
                     'accumulation_steps': str(GRAD_ACCUMULATION_STEPS),
                     'gradient_reduction': 'mean',
-                    'state_key': env.state_key or '',
+                    'input_protocol': INPUT_PROTOCOL,
+                    'uses_privileged_state': 'false',
+                    'state_key': '',
                     'train_result_dir': f'results/train/{name}',
                     'eval_result_dir': (
-                        f'results/eval/{env.slug}/{METHOD}/seed_{seed}'
+                        f'results/eval/{env.slug}/{RESULT_GROUP}/seed_{seed}'
                     ),
                     'dataset_file': env.dataset_file,
                     'num_eval': str(NUM_EVAL),

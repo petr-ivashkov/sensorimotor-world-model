@@ -48,7 +48,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-IFS=$'\t' read -r ENV_SLUG RUN_LABEL DATASET_FILE < <(
+IFS=$'\t' read -r ENV_SLUG RUN_LABEL DATASET_FILE RESULT_GROUP < <(
     python - "$MANIFEST" "$RUN_NAME" <<'PY'
 import csv
 import sys
@@ -57,7 +57,13 @@ manifest_path, run_name = sys.argv[1:3]
 with open(manifest_path, newline="", encoding="utf-8") as handle:
     for row in csv.DictReader(handle, delimiter="\t"):
         if row["run_name"] == run_name:
-            print(row["env"], row["run_label"], row["dataset_file"], sep="\t")
+            print(
+                row["env"],
+                row["run_label"],
+                row["dataset_file"],
+                row["result_group"],
+                sep="\t",
+            )
             raise SystemExit(0)
 raise SystemExit(f"Run {run_name!r} not found in {manifest_path}")
 PY
@@ -70,7 +76,7 @@ if [ "${LWM_DRY_RUN:-0}" != "1" ] \
         --root "$EXTERNAL_DATA_ROOT"
 fi
 
-METHOD_ROOT="$BASE_RUNS_ROOT/$ENV_SLUG/dino_wm"
+METHOD_ROOT="$BASE_RUNS_ROOT/$ENV_SLUG/$RESULT_GROUP"
 RUN_DIR="$METHOD_ROOT/$RUN_LABEL"
 /bin/mkdir -p "$METHOD_ROOT"
 

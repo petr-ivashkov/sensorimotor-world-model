@@ -11,6 +11,7 @@ import statistics
 from pathlib import Path
 from typing import Any
 
+from protocol import validate_manifest_row
 
 METRIC_ALIASES = {
     'success_rate': ('success_rate', 'success', 'success_mean'),
@@ -49,6 +50,7 @@ def aggregate(exp_dir: Path) -> list[dict[str, str]]:
     rows = load_manifest(exp_dir / 'generated_configs' / 'manifest.tsv')
     output: list[dict[str, str]] = []
     for row in rows:
+        validate_manifest_row(row)
         run_dir = exp_dir / row['eval_result_dir']
         metrics_path = run_dir / 'metrics.json'
         status = 'missing'
@@ -58,7 +60,17 @@ def aggregate(exp_dir: Path) -> list[dict[str, str]]:
             try:
                 result = json.loads(metrics_path.read_text(encoding='utf-8'))
                 metrics = result.get('metrics', {})
-                status = 'ok'
+                source_run = Path(str(result.get('run_dir', ''))).name
+                if source_run != row['run_name']:
+                    status = 'source_run_mismatch'
+                elif int(result.get('seed', -1)) != int(row['policy_seed']):
+                    status = 'policy_seed_mismatch'
+                elif int(result.get('task_seed', -1)) != int(
+                    row['eval_task_seed']
+                ):
+                    status = 'task_seed_mismatch'
+                else:
+                    status = 'ok'
             except json.JSONDecodeError:
                 status = 'invalid_json'
 
@@ -68,12 +80,16 @@ def aggregate(exp_dir: Path) -> list[dict[str, str]]:
                 'env': row['env'],
                 'env_label': row['env_label'],
                 'method': row['method'],
+                'variant': row['variant'],
+                'result_group': row['result_group'],
                 'seed': row['seed'],
                 'run_label': row['run_label'],
                 'history': row['history'],
                 'backbone': row['backbone'],
                 'backbone_revision': row['backbone_revision'],
                 'protocol_version': row['protocol_version'],
+                'input_protocol': row['input_protocol'],
+                'uses_privileged_state': row['uses_privileged_state'],
                 'reference_batch_size': row['reference_batch_size'],
                 'micro_batch_size': row['micro_batch_size'],
                 'accumulation_steps': row['accumulation_steps'],

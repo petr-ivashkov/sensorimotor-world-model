@@ -22,7 +22,7 @@ The maintained implementation cites the original DINO-WM code:
 
 The active objective is the shipped teacher-forcing MSE between the predicted
 and target non-action embeddings. DINOv2-Small is frozen. The predictor,
-action encoder, and state encoder are trainable.
+and action encoder are trainable.
 
 The Hugging Face backbone is pinned to revision
 `ed25f3a31f01632728cabb09d1542f84ab7b0056`.
@@ -38,7 +38,17 @@ Adaptations are limited to the controlled comparison:
 - the same CEM planner, tasks, seeds, and evaluation budget as `planning_eval`;
 - repository-standard strict checkpoints.
 
-TwoRoom and Push-T use the standard proprioception and action encoders. Reacher
-uses its corresponding `observation` vector. OGBench-Cube follows the maintained
-action-only DINO-WM configuration because its planning interface does not expose
-a matching goal observation.
+All four environments use exactly the `action` auxiliary encoder. Training and
+planning receive pixels and actions only; no proprioception, observation vector,
+agent position, or other simulator state is encoded. Planning cost compares only
+predicted DINO patch features with the goal-image DINO patch features.
+
+The official LeWM release independently distinguishes `dinowm` from
+`dinowm_noprop` and publishes the no-proprioception variant for these four
+environments:
+
+- repository: `https://github.com/lucas-maes/le-wm`
+
+That release is protocol precedent only. This experiment uses the locked
+implementation and matched data, optimizer-update budget, planner, and
+evaluation tasks documented above.

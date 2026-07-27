@@ -1,4 +1,4 @@
-# DINO-WM baseline
+# DINO-WM baseline (no proprioception)
 
 Five-seed evaluation of DINO-WM under the shared planning protocol:
 
@@ -12,14 +12,20 @@ The experiment uses the DINO-WM implementation in the locked
 `stable-worldmodel==0.0.6` dependency. Source details are in `SOURCE.md`.
 
 - frozen pretrained DINOv2-Small patch encoder;
-- DINO-WM causal predictor and action/state encoders;
+- DINO-WM causal predictor and action encoder;
 - matched predictor history `H=1`;
 - pure teacher-forcing MSE on the predicted non-action embedding;
 - 10 epochs, effective batch size 256, AdamW with learning rate `1e-4` and
   weight decay `1e-3`;
 - physical batch size 32 with eight-step mean-gradient accumulation, the shared
   optimizer-update-indexed linear-warmup cosine schedule, and `bf16` precision;
-- state and action conditioning where supported, with action-only OGBench-Cube.
+- pixels and actions only in every environment.
+
+The model and planner never use or encode `proprio`, `observation`, agent
+position, or any other simulator state. Simulator state is used only by the
+common evaluation harness to initialize tasks and score success, as it is for
+every method. Planning cost is computed only between predicted DINO patch
+features and DINO patch features of the goal image.
 
 DINO-WM ships with `H=3`; only history is changed to `H=1` for the controlled
 main-figure comparison. Its architecture and objective are unchanged; optimization
@@ -40,11 +46,12 @@ Validation and logging intervals are scaled by eight so they occur after the
 same number of optimizer updates and examples as in the main training pipeline.
 The loader uses the shared 24 workers and prefetch factor 4.
 
-Outputs remain under this folder:
+The corrected runs use versioned names and directories so that checkpoints and
+metrics from the earlier state-conditioned protocol cannot be mixed in:
 
 ```text
-results/train/<run_name>/
-results/eval/<environment>/dino_wm/seed_<seed>/
+results/train/<environment>_dino_wm_noprop_seed<seed>/
+results/eval/<environment>/dino_wm_noprop/seed_<seed>/
 ```
 
 ## Cluster
@@ -71,11 +78,30 @@ jupyter nbconvert --to notebook --execute --inplace plot_results.ipynb
 `cache_backbone.py` downloads DINOv2-Small once into the shared Hugging Face
 cache. Lightning output is written to `logs/condor.train.*.err`.
 
+Before launching the replacement runs, remove only the incompatible
+state-conditioned DINO-WM jobs and outputs:
+
+```bash
+cd experiments/dino_wm
+
+condor_q "$USER" -autoformat ClusterId ProcId Args \
+  | awk '$3 ~ /_dino_wm_seed[0-9]+$/ {print $1 "." $2}' \
+  | xargs -r condor_rm
+
+rm -rf results/train/{tworoom,reacher,pusht,ogbcube}_dino_wm_seed{0,1,2,3,4}
+rm -rf results/eval/{tworoom,reacher,pusht,ogbcube}/dino_wm
+rm -f aggregated_results.csv dino_wm_summary_results.csv
+rm -f comparison_results.csv comparison_summary_results.csv
+rm -f dino_wm_comparison.pdf
+mkdir -p logs
+find logs -maxdepth 1 -type f -name '*_dino_wm_seed*' -delete
+```
+
 Single-run smoke test:
 
 ```bash
 cd experiments/dino_wm
-RUNS_ROOT=$PWD/results_smoke/train ./train_run.sh pusht_dino_wm_seed0 \
+RUNS_ROOT=$PWD/results_smoke/train ./train_run.sh pusht_dino_wm_noprop_seed0 \
   trainer.max_epochs=1 +trainer.limit_train_batches=2 \
   trainer.val_check_interval=1 \
   trainer.limit_val_batches=1 trainer.log_every_n_steps=1 \
@@ -84,7 +110,8 @@ RUNS_ROOT=$PWD/results_smoke/train ./train_run.sh pusht_dino_wm_seed0 \
 ```
 
 Do not evaluate checkpoints whose saved config lacks protocol
-`matched_batch256_mean_accumulation_v2`.
+`matched_batch256_pixels_actions_v3`. Training, checkpoint validation,
+evaluation, aggregation, and plotting all reject incompatible protocols.
 
 ## Local
 
@@ -111,19 +138,13 @@ jupyter nbconvert --to notebook --execute --inplace plot_results.ipynb
 
 ## Transfer results from the cluster
 
-Set the absolute checkout path on the cluster, then run from the local repository
-root. This transfers metrics and configs, not checkpoints:
+Run from the local repository root after evaluation. This transfers metrics, not
+checkpoints:
 
 ```bash
-REMOTE_REPO=/absolute/path/to/cluster/checkout
-rsync -av --prune-empty-dirs \
-  --include='*/' \
-  --include='metrics.json' \
-  --include='metrics.csv' \
-  --include='config.yaml' \
-  --exclude='*' \
-  "mpi-cluster:${REMOTE_REPO}/planning/experiments/dino_wm/results/" \
-  planning/experiments/dino_wm/results/
+rsync -av \
+  mpi-cluster:~/projects/sensorimotor-world-model/planning/experiments/dino_wm/results/eval/ \
+  planning/experiments/dino_wm/results/eval/
 
 cd planning/experiments/dino_wm
 python generate_configs.py

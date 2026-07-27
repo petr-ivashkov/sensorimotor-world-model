@@ -10,8 +10,15 @@ from pathlib import Path
 import torch
 from omegaconf import OmegaConf
 
+from protocol import (
+    EXPECTED_ENCODING,
+    INPUT_PROTOCOL,
+    PROTOCOL_VERSION,
+    RESULT_GROUP,
+    validate_input_protocol,
+    validate_manifest_row,
+)
 
-EXPECTED_PROTOCOL = 'matched_batch256_mean_accumulation_v2'
 EXPECTED_EPOCHS = 10
 EXPECTED_REFERENCE_BATCH = 256
 EXPECTED_MICRO_BATCH = 32
@@ -21,15 +28,6 @@ EXPECTED_PREFETCH_FACTOR = 4
 EXPECTED_VALIDATION_INTERVAL = 500 * EXPECTED_ACCUMULATION
 EXPECTED_VALIDATION_BATCHES = 10 * EXPECTED_ACCUMULATION
 EXPECTED_LOG_INTERVAL = 25 * EXPECTED_ACCUMULATION
-
-
-def expected_encoding(state_key: str) -> dict[str, int]:
-    encoding = {}
-    if state_key:
-        encoding[state_key] = 10
-    encoding['action'] = 10
-    return encoding
-
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -49,6 +47,11 @@ def main() -> None:
     if len(rows) != 20:
         failures.append(f'manifest: expected 20 rows, found {len(rows)}')
     for row in rows:
+        try:
+            validate_manifest_row(row)
+        except RuntimeError as error:
+            failures.append(str(error))
+            continue
         run_dir = exp_dir / row['train_result_dir']
         checkpoint_path = run_dir / 'checkpoints' / 'last.ckpt'
         required = (
@@ -67,6 +70,11 @@ def main() -> None:
             continue
 
         cfg = OmegaConf.load(run_dir / 'config.yaml')
+        try:
+            validate_input_protocol(cfg)
+        except RuntimeError as error:
+            failures.append(f"{row['run_name']}: {error}")
+            continue
         accumulation = int(cfg.trainer.get('accumulate_grad_batches', 1))
         updates_per_epoch = int(
             cfg.dino_wm_experiment.get('optimizer_updates_per_epoch', 0)
@@ -107,7 +115,7 @@ def main() -> None:
             'matching enabled': bool(matching.get('enabled', False)),
             'protocol version': str(
                 matching.get('protocol_version', '')
-            ) == EXPECTED_PROTOCOL,
+            ) == PROTOCOL_VERSION,
             'reference batch size': int(
                 matching.get('reference_batch_size', 0)
             ) == EXPECTED_REFERENCE_BATCH,
@@ -154,7 +162,7 @@ def main() -> None:
             'backbone revision': str(cfg.backbone.revision)
             == row['backbone_revision'],
             'manifest protocol': row.get('protocol_version', '')
-            == EXPECTED_PROTOCOL,
+            == PROTOCOL_VERSION,
             'manifest reference batch': int(
                 row.get('reference_batch_size', 0)
             ) == EXPECTED_REFERENCE_BATCH,
@@ -168,8 +176,18 @@ def main() -> None:
                 'gradient_reduction',
                 '',
             ) == 'mean',
-            'encoding': dict(cfg.wm.encoding)
-            == expected_encoding(row['state_key']),
+            'input protocol': str(
+                cfg.dino_wm_experiment.get('input_protocol', '')
+            ) == INPUT_PROTOCOL,
+            'privileged-state disabled': not bool(
+                cfg.dino_wm_experiment.get('uses_privileged_state', True)
+            ),
+            'encoding': dict(cfg.wm.encoding) == EXPECTED_ENCODING,
+            'run name': row['run_name'].endswith(
+                f"_{RESULT_GROUP}_seed{row['seed']}"
+            ),
+            'result directory': Path(row['train_result_dir']).name
+            == row['run_name'],
         }
         for label, passed in checks.items():
             if not passed:
@@ -181,6 +199,16 @@ def main() -> None:
             weights_only=False,
             mmap=True,
         )
+        forbidden_encoders = [
+            key
+            for key in checkpoint.get('state_dict', {})
+            if 'extra_encoders.' in key
+            and 'extra_encoders.action.' not in key
+        ]
+        if forbidden_encoders:
+            failures.append(
+                f"{row['run_name']}: checkpoint contains a non-action encoder"
+            )
         if int(checkpoint.get('global_step', -1)) != expected_total_updates:
             failures.append(
                 f"{row['run_name']}: checkpoint optimizer-step mismatch"
