@@ -43,20 +43,23 @@ def load_json(path: Path) -> tuple[dict[str, Any], str]:
 
 def planning_success(payload: dict[str, Any]) -> float:
     metrics = payload.get("metrics", payload)
-    for name in SUCCESS_ALIASES:
-        if name in metrics:
-            value = parse_float(metrics[name])
-            if math.isfinite(value):
-                return value * 100.0 if 0.0 <= value <= 1.0 else value
 
     episode_successes = metrics.get("episode_successes")
     if isinstance(episode_successes, list):
         values = [bool(value) for value in episode_successes]
-    else:
-        values = [
-            token == "True"
-            for token in re.findall(r"True|False", str(episode_successes))
-        ]
+        if values:
+            return 100.0 * sum(values) / len(values)
+
+    for name in SUCCESS_ALIASES:
+        if name in metrics:
+            value = parse_float(metrics[name])
+            if math.isfinite(value):
+                return value
+
+    values = [
+        token == "True"
+        for token in re.findall(r"True|False", str(episode_successes))
+    ]
     return 100.0 * sum(values) / len(values) if values else math.nan
 
 

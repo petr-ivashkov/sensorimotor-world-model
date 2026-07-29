@@ -38,4 +38,4 @@ jupyter notebook plot_results.ipynb
 ```
 
 `plot_results.ipynb` loads `aggregated_results.csv` and displays the planning-success figure
-(mean ± SE over seeds/repeats) inline.
+(mean ± STD over seeds/repeats) inline.

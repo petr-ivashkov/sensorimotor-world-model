@@ -22,6 +22,9 @@ The post-training diagnostics use 4,096 held-out sequences:
 
 For `lambda=0`, `inverse_mse` measures the untrained inverse head and is included only as a
 diagnostic. `train_run.sh` computes `diagnostics.json` immediately after each training run.
+Latent variance and vector length diagnose scale collapse without simulator access.
+Effective rank is scale-invariant and is reported as a representation diagnostic, not as a
+criterion for selecting `lambda`.
 
 ## Layout
 
