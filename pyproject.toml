@@ -2,7 +2,8 @@
 name = "sensorimotor-world-model"
 version = "0.1.0"
 description = "Sensorimotor world models with a joint forward + inverse-dynamics objective"
-requires-python = ">=3.13"
+# pyarrow<21 has wheels through Python 3.13.
+requires-python = ">=3.13,<3.14"
 dependencies = [
     # toy/ — dot-world / sprite experiments (CPU-friendly)
     "torch>=2.2",
@@ -13,7 +14,8 @@ dependencies = [
     "ipykernel>=7.2.0",
     "jupyter>=1.1.1",
     # planning/ — LeWM-based planning experiments (needs a CUDA GPU to run)
-    "stable-worldmodel[train,env]==0.0.6",
+    "stable-worldmodel[train]==0.0.6",
+    "stable-worldmodel[env]==0.0.6; sys_platform == 'linux'",
     "stable-pretraining==0.1.6",
     "gym-pusht==0.1.6",
     "pymunk<7",
@@ -33,3 +35,7 @@ dependencies = [
 package = false
 override-dependencies = ["opencv-python-headless"]
 constraint-dependencies = ["opencv-python-headless"]
+
+[tool.uv.extra-build-dependencies]
+# gymnasium[all] pulls in box2d-py, whose build requires the SWIG executable.
+box2d-py = ["swig"]
