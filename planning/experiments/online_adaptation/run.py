@@ -33,7 +33,7 @@ import numpy as np
 import torch
 import yaml
 from omegaconf import OmegaConf
-from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
+from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler, default_collate
 
 from planning.experiments.online_adaptation.adaptation import OnlineLearner
 from planning.experiments.online_adaptation.data import (
@@ -120,6 +120,9 @@ def validate_config(cfg):
     for key in ("episodes_per_round", "updates_per_round"):
         if not isinstance(cfg[key], int) or cfg[key] < 1:
             raise ValueError(f"{key} must be a positive integer")
+    limit = cfg.get("update_seconds_per_round")
+    if limit is not None and (not isinstance(limit, (int, float)) or not math.isfinite(limit) or limit <= 0):
+        raise ValueError("update_seconds_per_round must be positive and finite")
     if cfg["training"]["batch_size"] < 2 or cfg["training"]["num_workers"] < 0:
         raise ValueError("Training needs batch_size >= 2 and nonnegative num_workers")
     fraction = cfg["replay"]["source_fraction"]
@@ -205,11 +208,20 @@ def _load_model(source_run, source_cfg, initialization, device):
     return model.to(device)
 
 
+def _training_collate(samples):
+    # Simulator state is diagnostic-only, and its dimensionality differs
+    # between one- and two-block replay. It must never enter model training.
+    return default_collate([{key: value for key, value in sample.items() if key != "state"}
+                            for sample in samples])
+
+
 def _loader(dataset, *, batch_size, workers=0, seed=0, train=False, source_fraction=0.0, target_size=None):
     generator = torch.Generator().manual_seed(seed)
     kwargs = {"batch_size": batch_size, "num_workers": workers,
               "drop_last": train, "pin_memory": torch.cuda.is_available(),
               "generator": generator}
+    if train:
+        kwargs["collate_fn"] = _training_collate
     if workers:
         kwargs.update(persistent_workers=True, prefetch_factor=2)
     if source_fraction:
@@ -349,7 +361,8 @@ def run_experiment(cfg, source_run, output_root, *, source_data=None, source_eva
         write_json(calibration_path, calibration)
     calibration = json.loads(calibration_path.read_text())
     if (not calibration["has_contacts"] or
-            calibration["mean_block_position_divergence"] < cfg["calibration"]["min_mean_position_divergence"]):
+            (cfg["calibration"].get("require_divergence", True) and
+             calibration["mean_block_position_divergence"] < cfg["calibration"]["min_mean_position_divergence"])):
         raise RuntimeError("Selected dynamics change produced too little divergence; inspect calibration.json and choose a new config/output")
     # Evaluation data uses a fixed collector, independent of adaptation/arm.
     holdout_cfg = {**cfg, "collection": {"policy": "weak", "dist_constraint": cfg["collection"].get("dist_constraint", 100)}}
@@ -407,9 +420,10 @@ def run_experiment(cfg, source_run, output_root, *, source_data=None, source_eva
             loader = _loader(replay, batch_size=cfg["training"]["batch_size"], workers=cfg["training"]["num_workers"],
                 seed=seed+index, train=True, source_fraction=cfg["replay"]["source_fraction"], target_size=target_size)
             update_start = time.monotonic()
-            training = learner.update(loader, cfg["updates_per_round"])
+            limit = cfg.get("update_seconds_per_round")
+            training = learner.update(loader, cfg["updates_per_round"], **({"max_seconds": limit} if limit is not None else {}))
             timing["update_seconds"] = time.monotonic() - update_start
-            timing["updates_per_second"] = cfg["updates_per_round"] / max(timing["update_seconds"], 1e-9)
+            timing["updates_per_second"] = training["steps"] / max(timing["update_seconds"], 1e-9)
             del loader
             for dataset in datasets:
                 dataset.close()

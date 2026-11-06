@@ -1,0 +1,9 @@
+# About 2.5 hours of updates, plus acquisition/diagnostics; job cap is 4h.
+base: pilot.yaml
+rounds: 20
+episodes_per_round: 64
+updates_per_round: 100000  # safety ceiling; time limit normally ends each phase
+update_seconds_per_round: 450
+diagnostics:
+  holdout_episodes: 64
+  max_clips: 1024

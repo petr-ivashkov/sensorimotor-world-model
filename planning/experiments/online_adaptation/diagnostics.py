@@ -35,10 +35,13 @@ def linear_cka(x: torch.Tensor, y: torch.Tensor) -> float:
 
 
 def physical_targets(state: torch.Tensor) -> torch.Tensor:
-    """Agent xy, block xy, sin(theta), cos(theta); raw Push-T angle is index 4."""
-    if state.shape[-1] != 7:
-        raise ValueError("Expected raw seven-component Push-T state")
-    return torch.cat((state[..., :4], state[..., 4:5].sin(), state[..., 4:5].cos()), -1)
+    """Agent xy and each block's xy/sin/cos, from the documented 7D/10D state."""
+    if state.shape[-1] not in (7, 10):
+        raise ValueError("Expected a raw 7D single-block or 10D two-block state")
+    values = [state[..., :4], state[..., 4:5].sin(), state[..., 4:5].cos()]
+    if state.shape[-1] == 10:
+        values.extend((state[..., 5:7], state[..., 7:8].sin(), state[..., 7:8].cos()))
+    return torch.cat(values, -1)
 
 
 def circular_mae(predicted: torch.Tensor, target: torch.Tensor) -> float:
@@ -50,7 +53,7 @@ def circular_mae(predicted: torch.Tensor, target: torch.Tensor) -> float:
 def _physical_errors(decoded: torch.Tensor, targets: torch.Tensor) -> dict[str, float]:
     delta = decoded - targets
     # Position RMSE is sqrt(mean(squared Euclidean error)), in simulator pixels.
-    return {
+    metrics = {
         "agent_position_rmse": float(delta[..., :2].square().sum(-1).mean().sqrt()),
         "block_position_rmse": float(delta[..., 2:4].square().sum(-1).mean().sqrt()),
         "block_angle_mae_rad": circular_mae(
@@ -58,6 +61,16 @@ def _physical_errors(decoded: torch.Tensor, targets: torch.Tensor) -> dict[str, 
             torch.atan2(targets[..., 4], targets[..., 5]),
         ),
     }
+    if targets.shape[-1] == 10:
+        metrics["block2_position_rmse"] = float(delta[..., 6:8].square().sum(-1).mean().sqrt())
+        metrics["block2_angle_mae_rad"] = circular_mae(
+            torch.atan2(decoded[..., 8], decoded[..., 9]),
+            torch.atan2(targets[..., 8], targets[..., 9]),
+        )
+        metrics["all_blocks_position_rmse"] = float(
+            torch.stack((delta[..., 2:4], delta[..., 6:8]), -2).square().sum(-1).mean().sqrt()
+        )
+    return metrics
 
 
 def _fit_ridge(features: torch.Tensor, targets: torch.Tensor, alpha: float):
@@ -110,8 +123,8 @@ def _validate_batch(batch: dict, min_time: int):
         raise ValueError("Expected pixels B,T,C,H,W and matching state B,T,7")
     if pixels.shape[1] < min_time:
         raise ValueError(f"Window needs at least {min_time} observations")
-    if state.shape[-1] != 7 or not torch.isfinite(state).all():
-        raise ValueError("Expected finite raw seven-component Push-T states")
+    if state.shape[-1] not in (7, 10) or not torch.isfinite(state).all():
+        raise ValueError("Expected finite raw 7D or 10D Push-T states")
 
 
 def _representation_metrics(current: torch.Tensor, baseline: torch.Tensor):

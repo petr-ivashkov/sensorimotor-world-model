@@ -1,0 +1,17 @@
+# Submit exactly two jobs, one for each committed configuration.
+universe = vanilla
+executable = /bin/bash
+arguments = overnight.sh --config $(config) --source-run $(source_run) --source-data $(source_data) --source-eval $(source_eval) --output-root $(output_root)/$(arm)
+getenv = true
+request_gpus = 1
+request_cpus = 8
+request_memory = 49152
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+periodic_remove = (JobStatus == 2) && (RemoteWallClockTime > 14400)
+output = $(output_root)/$(arm).stdout
+error = $(output_root)/$(arm).stderr
+log = $(output_root)/$(arm).condor.log
+queue arm, config from (
+u overnight_u.yaml
+two_block overnight_two_block.yaml
+)

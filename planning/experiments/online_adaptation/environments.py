@@ -51,6 +51,10 @@ def make_world(env_config, *, seed, num_envs=1):
         from planning.experiments.online_adaptation.shape_env import register_shape_environments
 
         register_shape_environments()
+    if env_name == "swm/PushT-TwoBlock-v0":
+        from planning.experiments.online_adaptation.two_block_env import register_two_block_environment
+
+        register_two_block_environment()
     image_size = int(cfg.pop("img_size", 224))
     image_shape = tuple(cfg.pop("image_shape", (image_size, image_size)))
     cfg.pop("reset_options", None)
@@ -152,9 +156,9 @@ def _collector_policy(policy_config, *, seed, model, process, plan_config, solve
     kind = cfg.pop("policy", cfg.pop("type", cfg.pop("kind", "weak")))
     cfg.pop("seed", None)
     if kind == "weak":
-        from stable_worldmodel.envs.pusht import WeakPolicy
+        from planning.experiments.online_adaptation.collection_policy import MultiBlockWeakPolicy
 
-        return _BoundedPolicy(lambda: WeakPolicy(seed=int(seed), **cfg)), kind
+        return _BoundedPolicy(lambda: MultiBlockWeakPolicy(seed=int(seed), **cfg)), kind
     if kind == "random":
         from stable_worldmodel.policy import RandomPolicy
 
@@ -189,7 +193,8 @@ def summarize_experience(path):
     except ImportError:
         pass
     counts = {"frames": 0, "raw_transitions": 0, "contact_transitions": 0}
-    displacement, angular_change = [], []
+    displacement, angular_change, displacement2, angular_change2 = [], [], [], []
+    secondary_contacts = {key: 0 for key in ("agent_block1_contact", "agent_block2_contact", "block_block_contact")}
     with h5py.File(path, "r") as f:
         lengths = np.asarray(f["ep_len"])
         offsets = np.asarray(f["ep_offset"])
@@ -206,6 +211,12 @@ def summarize_experience(path):
             counts["raw_transitions"] += int(valid.sum())
             displacement.extend(np.linalg.norm(np.diff(states[:, 2:4], axis=0), axis=-1))
             angular_change.extend(_angle_distance(states[1:, 4], states[:-1, 4]))
+            if states.shape[-1] == 10:
+                displacement2.extend(np.linalg.norm(np.diff(states[:, 5:7], axis=0), axis=-1))
+                angular_change2.extend(_angle_distance(states[1:, 7], states[:-1, 7]))
+                for key in secondary_contacts:
+                    if key in f:
+                        secondary_contacts[key] += int(np.count_nonzero(f[key][offset+1:offset+length]))
             if "n_contacts" in f:
                 contacts = np.asarray(f["n_contacts"][offset + 1 : offset + length])
                 counts["contact_transitions"] += int(np.count_nonzero(contacts))
@@ -215,6 +226,10 @@ def summarize_experience(path):
     counts["contact_fraction"] = counts["contact_transitions"] / max(transitions, 1)
     counts["block_motion_mean"] = float(np.mean(displacement)) if displacement else 0.0
     counts["block_angle_change_mean"] = float(np.mean(angular_change)) if angular_change else 0.0
+    if displacement2:
+        counts["block2_motion_mean"] = float(np.mean(displacement2))
+        counts["block2_angle_change_mean"] = float(np.mean(angular_change2))
+        counts.update({key+"_fraction": value/max(transitions, 1) for key, value in secondary_contacts.items()})
     counts["path"] = str(Path(path).resolve())
     return counts
 
@@ -278,7 +293,10 @@ def _step_with_action(world, actions):
 
 
 def _last_state(world):
-    return np.asarray(world.infos["state"])[0].reshape(-1, 7)[-1].copy()
+    state = np.asarray(world.infos["state"])[0]
+    if not np.isfinite(state).all():
+        raise ValueError("Simulator returned a nonfinite physical state")
+    return state.reshape(-1, state.shape[-1])[-1].copy()
 
 
 def calibrate_shift(source_env_config, target_env_config, *, seed, steps=100,
@@ -296,7 +314,10 @@ def calibrate_shift(source_env_config, target_env_config, *, seed, steps=100,
         target = make_world(target_cfg, seed=seed)
         source.reset(seed=int(seed), options=_reset_options(source_cfg))
         target.reset(seed=int(seed), options=_reset_options(target_cfg))
-        initial_difference = float(np.linalg.norm(_last_state(source) - _last_state(target)))
+        # Compare shared physical coordinates; a second block adds three
+        # diagnostic state entries but keeps the original first five intact.
+        source_state, target_state = _last_state(source), _last_state(target)
+        initial_difference = float(np.linalg.norm(source_state[:5] - target_state[:5]))
         policy, _ = _collector_policy(
             policy_config or {"type": "weak"}, seed=seed,
             model=None, process=None, plan_config=None, solver_config=None,
@@ -318,6 +339,8 @@ def calibrate_shift(source_env_config, target_env_config, *, seed, steps=100,
         return {
             "seed": int(seed), "steps": actual_steps,
             "initial_state_difference": initial_difference,
+            "source_state_dim": int(source_state.size),
+            "target_state_dim": int(target_state.size),
             "mean_block_position_divergence": float(np.mean(position_errors)),
             "final_block_position_divergence": position_errors[-1],
             "mean_block_angle_divergence": float(np.mean(angle_errors)),

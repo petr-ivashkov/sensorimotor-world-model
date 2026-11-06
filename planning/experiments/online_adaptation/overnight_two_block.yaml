@@ -1,0 +1,12 @@
+# Original T + a second T; same model, objective and budget as the U run.
+base: overnight_u.yaml
+target_change:
+  env_name: swm/PushT-TwoBlock-v0
+  reset_options:
+    variation: [agent.start_position, block.start_position, block.angle]
+    variation_values:
+      block.shape: 2
+calibration:
+  # A second object is a structural change even if the first T follows the
+  # same trajectory in one replay. Contact and finite-state checks still run.
+  require_divergence: false

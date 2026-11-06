@@ -256,6 +256,26 @@ class RunIntegrationTests(unittest.TestCase):
             torch.testing.assert_close(value, expected[key], rtol=0, atol=0)
         self.assert_sources_unchanged()
 
+    def test_two_block_state_runs_with_source_replay_and_separate_diagnostics(self):
+        def two_block_shard(path, env, **kwargs):
+            result = synthetic_shard(path, kwargs["episodes"])
+            with h5py.File(path, "r+") as handle:
+                primary = handle["state"][:]
+                secondary = np.stack((primary[:, 2]+60, primary[:, 3]+50, primary[:, 4]+.2), -1)
+                del handle["state"]
+                handle["state"] = np.concatenate((primary[:, :5], secondary, primary[:, -2:]), -1)
+            return result
+        self.collector.side_effect = two_block_shard
+        self.cfg["replay"]["source_fraction"] = .25
+        self.cfg["planning"]["enabled"] = False
+        output = self.root / "two_block"
+        self.execute(output)
+        result = json.loads((output / "metrics/round_001.json").read_text())
+        self.assertIn("horizon_1.prediction.block2_position_rmse", result["target"]["diagnostics"])
+        self.assertNotIn("observed.block2_position_rmse", result["source"]["diagnostics"])
+        self.assertEqual(result["updates"], 2)
+        self.assert_sources_unchanged()
+
     def test_reuse_rejects_corrupted_immutable_shard(self):
         output = self.root / "online"
         self.execute(output)

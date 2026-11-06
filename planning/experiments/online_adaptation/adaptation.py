@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import math
 import random
+import time
 from collections.abc import Mapping
 from contextlib import nullcontext
 from typing import Any
@@ -172,8 +173,12 @@ class OnlineLearner:
         losses["loss"] = total
         return losses
 
-    def update(self, loader: Any, steps: int) -> dict[str, float | int]:
-        """Take exactly ``steps`` updates, cycling a finite loader as needed.
+    def update(self, loader: Any, steps: int, *, max_seconds: float | None = None) -> dict[str, float | int]:
+        """Take up to ``steps`` updates, cycling a finite loader as needed.
+
+        Without ``max_seconds``, take exactly ``steps`` updates. With a time
+        budget, finish the current optimizer step before stopping (at least one).
+        The budget includes data loading; it measures wall time, not GPU duty.
 
         Report means over optimizer steps. ``update_steps`` counts all updates
         since online initialization; ``steps`` counts updates in this call.
@@ -183,10 +188,16 @@ class OnlineLearner:
             raise ValueError("steps must be a nonnegative integer")
         if steps == 0:
             return {"steps": 0, "update_steps": self.update_steps}
+        if max_seconds is not None and (not math.isfinite(max_seconds) or max_seconds <= 0):
+            raise ValueError("max_seconds must be positive and finite")
         self.model.train()
+        started = time.monotonic()
         iterator = iter(loader)
         sums: dict[str, float] = {}
+        completed = 0
         for _ in range(steps):
+            if completed and max_seconds is not None and time.monotonic()-started >= max_seconds:
+                break
             try:
                 raw_batch = next(iterator)
             except StopIteration:
@@ -216,11 +227,14 @@ class OnlineLearner:
             )
             self.optimizer.step()
             self.update_steps += 1
+            completed += 1
+            if max_seconds is not None and completed % 100 == 0:
+                print(f"  updates={self.update_steps} phase_steps={completed} elapsed={time.monotonic()-started:.1f}s", flush=True)
             for name, value in losses.items():
                 sums[name] = sums.get(name, 0.0) + float(value.detach())
             sums["gradient_norm"] = sums.get("gradient_norm", 0.0) + float(grad_norm)
-        return {**{name: value / steps for name, value in sums.items()},
-                "steps": steps, "update_steps": self.update_steps}
+        return {**{name: value / completed for name, value in sums.items()},
+                "steps": completed, "update_steps": self.update_steps}
 
     def state_dict(self) -> dict[str, Any]:
         """Return an independent snapshot suitable for ``torch.save``.
