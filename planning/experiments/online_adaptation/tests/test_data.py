@@ -175,6 +175,29 @@ class ExperienceDataTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "contiguous"):
             episode_metadata(self.path)
 
+    def test_chunked_pixels_match_strided_reference_without_hyperslab_reads(self):
+        write_shard(self.path, lengths=(201, 201))
+        with h5py.File(self.path, "r+") as handle:
+            pixels = handle["pixels"][:]
+            del handle["pixels"]
+            handle.create_dataset("pixels", data=pixels, chunks=(100, 2, 2, 3), compression="gzip")
+        dataset = self.dataset(frameskip=5, num_steps=6)
+        dataset[0]
+        original = dataset._pixels
+        indices = []
+        class ScalarReader:
+            def __getitem__(self, index):
+                indices.append(index)
+                self_test.assertIsInstance(index, int)
+                return original[index]
+        self_test = self
+        dataset._pixels = ScalarReader()
+        actual = dataset[87]["pixels"].permute(0, 2, 3, 1).numpy()
+        with h5py.File(self.path, "r") as handle:
+            reference = handle["pixels"][87:113:5]
+        np.testing.assert_array_equal(actual, reference)
+        self.assertEqual(indices, [87, 92, 97, 102, 107, 112])
+
     def test_open_dataset_can_be_pickled_without_sharing_hdf5_handle(self):
         dataset = self.dataset(frameskip=2, num_steps=3)
         expected = dataset[0]

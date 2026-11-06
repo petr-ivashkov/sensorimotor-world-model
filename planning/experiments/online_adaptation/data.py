@@ -119,6 +119,7 @@ class ExperienceDataset(Dataset):
                  max_clips: int | None = None, sample_seed: int = 0,
                  clip_stride: int = 1):
         self._handle = None
+        self._pixels = None
         self._pid = None
         self.path = Path(path).resolve()
         self.frameskip, self.num_steps = int(frameskip), int(num_steps)
@@ -166,11 +167,16 @@ class ExperienceDataset(Dataset):
         if self._handle is None or self._pid != os.getpid():
             self.close()
             self._handle = h5py.File(self.path, "r", rdcc_nbytes=32 * 1024 * 1024)
+            self._pixels = self._handle["pixels"]
             self._pid = os.getpid()
         ep, start = self.clips[index]
         begin = int(self.offsets[ep]) + start
         end = begin + self.span_actions + 1
-        pixels = self._handle["pixels"][begin:end:self.frameskip]
+        # Compressed SWM pixels are chunked in 100-frame groups. A strided
+        # HDF5 hyperslab has expensive scatter-copy overhead even with cached
+        # chunks. Scalar frame reads are contiguous and reuse the dataset's
+        # raw chunk cache. Read exactly the same selected frames, in order.
+        pixels = np.stack([self._pixels[row] for row in range(begin, end, self.frameskip)])
         if pixels.ndim != 4 or pixels.shape[-1] not in (1, 3):
             raise ValueError("Expected SWM pixels in (time,height,width,channels) layout")
         raw = self.actions[begin:begin + self.span_actions]
@@ -187,10 +193,12 @@ class ExperienceDataset(Dataset):
         if getattr(self, "_handle", None) is not None:
             self._handle.close()
             self._handle = None
+        self._pixels = None
 
     def __getstate__(self):
         state = self.__dict__.copy()
         state["_handle"] = None
+        state["_pixels"] = None
         state["_pid"] = None
         return state
 

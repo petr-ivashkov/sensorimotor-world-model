@@ -185,3 +185,9 @@ two blocks, `two_block_curves.pdf`. A scheduler hard kill may skip that export;
 run `python -m planning.experiments.online_adaptation.export_review OUTPUT`
 afterward to regenerate them from completed outputs. Each run is one seed and
 an exploratory adaptation curve, not a replicated scientific comparison.
+
+Compressed pixel reads keep a dataset handle per worker and read each requested
+frame contiguously. This avoids HDF5 strided-hyperslab scatter overhead while
+returning the same frames and action alignment. A local 128-clip benchmark on
+real recorded pixels took 3.2s with strided hyperslabs versus 0.007s with cached
+scalar frame reads; end-to-end training speedup is measured separately.
