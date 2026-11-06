@@ -1,0 +1,18 @@
+base: pilot.yaml
+rounds: 1
+episodes_per_round: 4
+updates_per_round: 5
+training:
+  batch_size: 16
+  num_workers: 0
+diagnostics:
+  holdout_episodes: 8
+  max_clips: 32
+  batch_size: 16
+planning:
+  num_tasks: 2
+  eval_budget: 25
+  solver:
+    num_samples: 32
+    n_steps: 3
+    topk: 8

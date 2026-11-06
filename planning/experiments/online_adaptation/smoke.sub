@@ -1,0 +1,15 @@
+# Small U-shaped-block adaptation run.
+# Invoke from this directory with SMWM_PYTHON pointing to the existing venv.
+universe = vanilla
+executable = /bin/bash
+arguments = run.sh --config smoke.yaml --source-run $(source_run) --source-data $(source_data) --source-eval $(source_eval) --output-root $(output_root)
+getenv = true
+request_gpus = 1
+request_cpus = 4
+request_memory = 32768
+requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
+periodic_remove = (JobStatus == 2) && (RemoteWallClockTime > 1800)
+output = $(output_root).stdout
+error = $(output_root).stderr
+log = $(output_root).condor.log
+queue 1
