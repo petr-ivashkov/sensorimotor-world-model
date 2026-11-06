@@ -7,7 +7,7 @@ request_gpus = 1
 request_cpus = 8
 request_memory = 49152
 requirements = regexp("H100", TARGET.CUDADeviceName) && TARGET.CUDAGlobalMemoryMb >= 40000
-periodic_remove = (JobStatus == 2) && (RemoteWallClockTime > 14400)
+periodic_remove = (JobStatus == 2) && ((time() - EnteredCurrentStatus) > 14400)
 output = $(output_root)/$(arm).stdout
 error = $(output_root)/$(arm).stderr
 log = $(output_root)/$(arm).condor.log
