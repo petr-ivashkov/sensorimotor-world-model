@@ -1,0 +1,10 @@
+decoder:
+  epochs: 30
+  batch_size: 256
+  lr: 0.001
+  seed: 42
+  eval_every: 5
+  weight_beta: 10.0
+encoder_run: sprite
+output:
+  run_name: sprite

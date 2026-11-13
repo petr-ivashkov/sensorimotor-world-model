@@ -7,30 +7,13 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import yaml
-from torch.utils.data import DataLoader, TensorDataset
-
-from train import Mean, build_world, load_config
+from train import REPO_ROOT, Mean, build_loaders, build_world, load_config
 from models import CNNDecoder, CNNEncoder
 
 
 # ─────────────────────────────────────────────────────────────────
 #  Data / model construction
 # ─────────────────────────────────────────────────────────────────
-
-def materialize_frames(ds) -> TensorDataset:
-    """Render a lazy transition dataset, keeping only obs_t."""
-    obs = [ds[i][0] for i in range(len(ds))]
-    return TensorDataset(torch.stack(obs))
-
-
-def build_loaders(ds_cfg, world_cfg, DatasetClass, seed, batch_size):
-    """Train + eval obs_t DataLoaders, reusing the encoder run's disjoint seeds."""
-    def loader(num_samples, ds_seed, shuffle):
-        ds = materialize_frames(DatasetClass(world_cfg, num_samples=num_samples, seed=ds_seed))
-        return DataLoader(ds, batch_size=batch_size, shuffle=shuffle)
-    return (loader(int(ds_cfg["train_samples"]), seed, True),
-            loader(int(ds_cfg["eval_samples"]), seed + 999, False))
-
 
 def load_frozen_encoder(run_dir, latent_dim, image_size, device):
     """Construct the encoder, load its weights, and freeze it."""
@@ -63,7 +46,7 @@ def compute_losses(encoder, decoder, obs, weight_beta, device):
 def eval_pass(encoder, decoder, loader, weight_beta, device):
     decoder.eval()
     mse = Mean()
-    for (obs,) in loader:
+    for obs, *_ in loader:
         _, plain = compute_losses(encoder, decoder, obs, weight_beta, device)
         mse.update(plain.item(), obs.numel())
     return mse.value
@@ -89,10 +72,15 @@ def save_outputs(out_dir, decoder, history):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a probe decoder d_ξ: z_t -> ô_t on a frozen encoder.")
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--smoke", action="store_true", help="Decode the short sprite example.")
     args = parser.parse_args()
 
     config_path = args.config.resolve()
     cfg = load_config(config_path)
+    if args.smoke:
+        cfg["decoder"].update(epochs=1, eval_every=1)
+        cfg["encoder_run"] += "_smoke"
+        cfg["output"]["run_name"] += "_smoke"
     d_cfg = cfg["decoder"]
     encoder_run = cfg["encoder_run"]
     run_name = cfg.get("output", {}).get("run_name", encoder_run)
@@ -106,7 +94,7 @@ def main() -> None:
 
     # The frozen encoder and the world it was trained on are the single source of
     # truth — rebuild the dataset from the encoder run's saved config.
-    run_dir = (config_path.parent / "results" / encoder_run).resolve()
+    run_dir = REPO_ROOT / "outputs" / encoder_run
     enc_cfg = yaml.safe_load((run_dir / "config.yaml").read_text())
     ds_cfg, m_cfg, t_cfg = enc_cfg["dataset"], enc_cfg["model"], enc_cfg["training"]
     world_cfg, DatasetClass, _ = build_world(ds_cfg)
@@ -114,7 +102,9 @@ def main() -> None:
     image_size = world_cfg.image_size
     data_seed = int(t_cfg["seed"])
 
-    out_dir = (config_path.parent / "results" / run_name).resolve()
+    out_dir = REPO_ROOT / "outputs" / run_name
+    if (out_dir / "decoder.pt").exists():
+        raise FileExistsError(f"Decoder already exists: {out_dir}. Change output.run_name.")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Config       : {config_path}")
@@ -130,7 +120,7 @@ def main() -> None:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-    print("Materializing train + eval observations ...")
+    print("Preparing train + eval datasets ...")
     train_loader, eval_loader = build_loaders(ds_cfg, world_cfg, DatasetClass, data_seed, batch_size)
     encoder = load_frozen_encoder(run_dir, latent_dim, image_size, device)
     decoder = CNNDecoder(latent_dim=latent_dim, image_size=image_size).to(device)
@@ -141,7 +131,7 @@ def main() -> None:
     for epoch in range(1, epochs + 1):
         decoder.train()
         mse = Mean()
-        for (obs,) in train_loader:
+        for obs, *_ in train_loader:
             weighted, plain = compute_losses(encoder, decoder, obs, weight_beta, device)
             opt.zero_grad(set_to_none=True)
             weighted.backward()

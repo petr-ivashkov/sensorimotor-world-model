@@ -1,0 +1,67 @@
+defaults:
+- data: tworoom
+- _self_
+- override hydra/job_logging: disabled
+- override hydra/hydra_logging: disabled
+hydra:
+  run:
+    dir: ${oc.env:RUNS_ROOT,${oc.env:REPO_ROOT}/outputs/train}/${subdir}
+  output_subdir: null
+  job:
+    chdir: false
+subdir: ${env}_${method}_seed${seed}
+seed: 0
+image_size: 224
+patch_size: 14
+num_workers: 24
+backbone:
+  name: facebook/dinov2-small
+  revision: ed25f3a31f01632728cabb09d1542f84ab7b0056
+  interpolate_pos_encoding: true
+wm:
+  history_size: 1
+  num_preds: 1
+  encoding:
+    action: 10
+predictor:
+  size: small
+  depth: 6
+  heads: 16
+  mlp_dim: 2048
+  dim_head: 64
+  dropout: 0.1
+  emb_dropout: 0.0
+optimizer:
+  type: AdamW
+  lr: 0.0001
+  weight_decay: 0.001
+trainer:
+  max_epochs: 10
+  strategy: auto
+  devices: auto
+  accelerator: gpu
+  precision: bf16
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 8
+  val_check_interval: 4000
+  limit_val_batches: 80
+  log_every_n_steps: 200
+loader:
+  batch_size: 32
+  num_workers: ${num_workers}
+  drop_last: true
+  persistent_workers: true
+  prefetch_factor: 4
+  pin_memory: true
+  shuffle: true
+data:
+  dataset:
+    num_steps: 2
+wandb:
+  enabled: false
+  config:
+    project: sensorimotor-world-model
+    name: ${subdir}
+    resume: never
+    log_model: false
+method: dino_wm

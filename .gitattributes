@@ -1,0 +1,3 @@
+# Keep source files and data checksums stable across platforms.
+* text=auto eol=lf
+*.png binary

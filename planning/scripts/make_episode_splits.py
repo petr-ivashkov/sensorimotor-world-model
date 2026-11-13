@@ -10,8 +10,7 @@ Outputs (siblings of the source files):
                                cube_single_expert_eval.h5
     reacher.h5             ->  reacher_train.h5, reacher_eval.h5
 
-The pre-existing ``pusht_expert_train.h5`` is the *full* pusht dataset and
-must be renamed to ``pusht_expert.h5`` before running this script.
+Download the source files following planning/README.md.
 
 For each output file, ``ep_len``, ``ep_offset`` and the per-row episode-id
 column (``episode_idx`` or ``ep_idx``) are rewritten so the file is
@@ -230,7 +229,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--root",
-        default=os.environ.get("EXTERNAL_DATA_ROOT", "data/external"),
+        default=os.environ.get(
+            "EXTERNAL_DATA_ROOT", Path(__file__).resolve().parents[1] / "data" / "external"
+        ),
         help="Directory containing the source HDF5 files.",
     )
     ap.add_argument(
@@ -240,6 +241,12 @@ def main() -> int:
     )
     args = ap.parse_args()
     root = Path(args.root)
+    if not any((root / job.source).is_file() for job in JOBS):
+        ap.error(
+            f"No source HDF5 datasets found in {root}. "
+            "Download the sources described in planning/README.md, or set --root. "
+            f"Expected at least one of: {', '.join(job.source for job in JOBS)}"
+        )
     for job in JOBS:
         run_job(root, job, args.force)
     return 0

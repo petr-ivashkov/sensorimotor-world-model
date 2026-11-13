@@ -1,62 +1,94 @@
 # Sensorimotor World Models
 ### Perception for Action via Inverse Dynamics
 
-[Petr Ivashkov](https://openreview.net/profile?id=~Petr_Ivashkov1), [Randall Balestriero](https://openreview.net/profile?id=~Randall_Balestriero1) and [Bernhard Schölkopf](https://openreview.net/profile?id=~Bernhard_Sch%C3%B6lkopf1)
+[Petr Ivashkov](https://openreview.net/profile?id=~Petr_Ivashkov1), [Randall Balestriero](https://openreview.net/profile?id=~Randall_Balestriero1), and [Bernhard Schölkopf](https://openreview.net/profile?id=~Bernhard_Sch%C3%B6lkopf1)
 
-<p align="center">
-  <b>[ <a href="https://arxiv.org/abs/2606.20104">Paper</a> ] · [ <a href="https://petr-ivashkov.github.io/sensorimotor-world-model.github.io/">Project page</a> ]</b>
-</p>
+[Paper](https://arxiv.org/abs/2606.20104) · [Project page](https://petr-ivashkov.github.io/sensorimotor-world-model.github.io/)
 
-<p align="center">
-  <img src="assets/schematic.png" alt="Sensorimotor world model schematic" width="90%">
-</p>
+<p align="center"><img src="assets/schematic.png" alt="Sensorimotor world model" width="90%"></p>
 
-## TL;DR
+SMWM learns visual representations by jointly training an encoder, a forward model,
+and an inverse model. Inverse dynamics provides the anti-collapse signal:
 
-We introduce a sensorimotor world model (SMWM): a latent world model trained end-to-end from
-pixels with inverse dynamics regularization as the sole anti-collapse mechanism. Empirically,
-SMWM learns interpretable low-dimensional representations and achieves competitive planning
-performance across 2D and 3D tasks.
+```text
+L = MSE(predicted_next_latent, next_latent) + λ · MSE(predicted_action, action)
+```
 
-## Method
+The main experiments use λ=10. The planning implementation builds on
+[LeWorldModel](https://github.com/lucas-maes/le-wm),
+[stable-worldmodel](https://github.com/galilai-group/stable-worldmodel), and
+[stable-pretraining](https://github.com/galilai-group/stable-pretraining).
 
-We train from transition tuples `(o_t, a_t, o_{t+1})`, where `o_t` is a pixel observation and
-`a_t` is the action vector taken between consecutive frames. An encoder maps each observation to
-a latent state, `z_t = f(o_t)`. On top of it we train two models jointly: a forward model that
-predicts the next latent from the current latent and action, `ẑ_{t+1} = g(z_t, a_t)`, and an
-inverse model that recovers the action from a pair of consecutive latents,
-`â_t = h(z_t, z_{t+1})`. The joint loss is
+## Setup
 
-`L = ||ẑ_{t+1} - z_{t+1}||² + λ·||â_t - a_t||²`
-
-with `λ` controlling the inverse term, which prevents representation collapse.
-
-## Repository structure
-
-Two self-contained subprojects share the method but target different settings:
-
-| Subproject | What it is |
-|---|---|
-| [`toy/`](toy/) | A simple instantiation of SMWM in a 2D dot-world — the place to experiment and build intuition for what structure the model learns. |
-| [`planning/`](planning/) | SMWM on richer 2D/3D environments (TwoRoom, Reacher, Push-T, OGBench-Cube) with the downstream planning application. Reproduces the paper's results. Needs a single CUDA GPU. |
-
-A single environment at the repo root covers both subprojects:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
 
 ```bash
-uv sync                      # creates ./.venv (Python 3.13, pinned in .python-version)
+git clone https://github.com/petr-ivashkov/sensorimotor-world-model.git
+cd sensorimotor-world-model
+uv sync --locked
 source .venv/bin/activate
 ```
 
-> On macOS/arm64 the `toy/` half installs and runs as-is. The planning simulator
-> extra is installed only on Linux; running `planning/` requires Linux + CUDA.
+Python 3.12 and dependencies are pinned. Toy experiments and analysis run on CPU,
+including macOS. Planning training and simulation use Linux with a CUDA GPU.
 
-## Instructions
+## Pretrained models and analysis
 
-- **Just try the method** → [`toy/`](toy/README.md):
-  ```bash
-  cd toy && python train.py --config experiments/single_dot/config.yaml
-  ```
-- **Reproduce the paper** (requires single CUDA GPU + datasets) → [`planning/`](planning/README.md). See [reproduction documnetation](planning/README.md#reproduce).
+[Checkpoints](https://huggingface.co/petr-ivashkov/smwm) and
+[analysis data](https://huggingface.co/datasets/petr-ivashkov/smwm-analysis)
+are available on Hugging Face. From the repository root, download the saved
+embeddings and planning results, plus a TwoRoom checkpoint and image samples:
+
+```bash
+python - <<'PY'
+from huggingface_hub import snapshot_download
+
+snapshot_download(
+    "petr-ivashkov/smwm-analysis", repo_type="dataset", revision="v1.0",
+    local_dir="planning/outputs",
+    allow_patterns=["embeddings/**", "eval/**", "samples/tworoom/*"],
+)
+snapshot_download(
+    "petr-ivashkov/smwm", revision="v1.0",
+    local_dir="planning/outputs/pretrained",
+    allow_patterns=["tworoom/smwm/seed0/*", "LICENSE*"],
+)
+PY
+```
+
+Run `jupyter lab` (or select `.venv` in VS Code), then open the
+[embedding](planning/analysis/embeddings.ipynb),
+[physical-probe](planning/analysis/physical_probes.ipynb), or
+[planning-results](planning/analysis/planning_results.ipynb) notebook. These run
+on CPU using the downloaded data. See [Planning](planning/README.md#pretrained-models)
+to encode images with a checkpoint or download other models.
+
+## Experiments
+
+| Directory | Contents |
+|---|---|
+| [toy/](toy/README.md) | Dot and sprite worlds: representation geometry, controllable structure, and reconstruction probes. |
+| [planning/](planning/README.md) | Pixel-based training and planning on TwoRoom, Reacher, Push-T, and OGBench-Cube; baselines and physical probes. |
+
+Try a short toy experiment:
+
+```bash
+python toy/train.py --config toy/config/dot.yaml --smoke
+```
+
+For planning, follow the [dataset preparation](planning/README.md#data), then:
+
+```bash
+cd planning
+python train.py data=tworoom method=smwm seed=0
+python eval.py env=tworoom run_dir=outputs/train/tworoom_smwm_seed0
+```
+
+The core planning code is in [jepa.py](planning/jepa.py), [module.py](planning/module.py),
+[train.py](planning/train.py), and [eval.py](planning/eval.py). Experiment settings live
+in [config/](planning/config/); [analysis notebooks](planning/analysis/) read the results of your runs.
+Datasets, checkpoints, and generated figures stay outside Git.
 
 ## Citation
 
@@ -74,5 +106,5 @@ source .venv/bin/activate
 
 ## License
 
-Released under the MIT License ([`LICENSE`](LICENSE)). The `planning/` subproject derives
-from LeWorldModel — see [`planning/README.md`](planning/README.md#credit) for attribution.
+[MIT](LICENSE). Third-party code retains its licenses and attribution; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

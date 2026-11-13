@@ -1,0 +1,22 @@
+dataset:
+  image_size: 64
+  dot_radius: 2
+  max_displacement: 16
+  allow_overlap: false
+  train_samples: 250000
+  eval_samples: 1000
+  groups:
+  - motion: independent
+    num_dots: 1
+model:
+  latent_dim: 64
+  hidden_dim: 256
+training:
+  seed: 42
+  epochs: 100
+  batch_size: 256
+  lr: 5e-4
+  lambda: 10.0
+  eval_every: 10
+output:
+  run_name: dot

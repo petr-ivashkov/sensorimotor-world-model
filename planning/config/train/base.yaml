@@ -1,18 +1,10 @@
 # @package _global_
 
-seed: 3072
+seed: 0
 img_size: 224
 patch_size: 14
 encoder_scale: tiny
-
 num_workers: 24
-
-artifacts:
-  save_resolved_config: true
-  log_lightning_hparams: false
-  use_external_callbacks: false
-  save_model_object: false
-
 trainer:
   max_epochs: 10
   devices: auto
@@ -22,37 +14,27 @@ trainer:
   val_check_interval: 500
   limit_val_batches: 10
   log_every_n_steps: 25
-
 loader:
   batch_size: 256
   num_workers: ${num_workers}
   persistent_workers: true
   prefetch_factor: 4
   pin_memory: true
-
 optimizer:
   type: AdamW
   lr: 1e-4
   weight_decay: 1e-3
-
 wandb:
-  enabled: true
-  log_config: false
+  enabled: false
   config:
-    entity: pivashkov-mpi-is
+    entity: null
     project: sensorimotor-world-model
     resume: never
     log_model: false
-
-validation_monitoring:
-  enabled: false
-  probe_ridge_alpha: 1.0
-
 wm:
   history_size: 1
   num_preds: 1
   embed_dim: 192
-
 predictor:
   depth: 6
   heads: 16
@@ -60,10 +42,8 @@ predictor:
   dim_head: 64
   dropout: 0.1
   emb_dropout: 0.0
-
 inverse:
   hidden_dim: 256
-
 loss:
   sigreg:
     weight: 0.0
@@ -71,19 +51,13 @@ loss:
       knots: 17
       num_proj: 1024
   inverse:
-    weight: 1.0
-
-compile:
-  enabled: false
-
+    weight: 10.0
 data:
   dataset:
-    # train.py raises this to wm.history_size + 1 when history_size > 1.
     num_steps: 2
-
 hydra:
   run:
-    dir: ${oc.env:RUNS_ROOT,results}/${subdir}
+    dir: ${oc.env:RUNS_ROOT,${oc.env:REPO_ROOT}/outputs/train}/${subdir}
   output_subdir: null
   job:
     chdir: false

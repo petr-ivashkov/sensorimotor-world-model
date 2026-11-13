@@ -1,35 +1,28 @@
-# Causal World Modelling in Dot World
+# Toy worlds
 
-JEPA-style latent world model — CNN encoder `f_θ`, forward model `g_φ`, inverse
-model `h_ψ`, trained jointly with `L = L_fwd + λ·L_inv`. The inverse loss is the
-anti-collapse signal.
-
-## Install
-
-The environment is defined once at the repo root (see the top-level [`README.md`](../README.md)):
+Small CNN-based SMWMs on dot and sprite worlds. Install the root
+[environment](../README.md#setup), then run from the repository root:
 
 ```bash
-uv sync                 # from the repo root; creates ../.venv (Python 3.13)
-source ../.venv/bin/activate
+python toy/train.py --config toy/config/dot.yaml --smoke
 ```
 
-Everything here runs on CPU (a GPU is used automatically if present).
+Omit `--smoke` for the full configuration. Other examples are
+[`structured.yaml`](config/structured.yaml) (coupled, independent, and random dots)
+and [`sprite.yaml`](config/sprite.yaml) (translation and rotation).
+Configs contain the dataset, network, loss, and optimizer settings.
+Samples are generated on demand; set `dataset.num_workers` to parallelize rendering.
+Results go to `toy/outputs/<run_name>/`; use a new `output.run_name` for a new run.
 
-## Reproduce
-
-Train, then open the experiment's notebook and **Run All**. Checkpoints land in `experiments/<exp>/results/<run_name>/`.
+For frozen-encoder image decoding:
 
 ```bash
-# single_dot
-python train.py --config experiments/single_dot/config.yaml
-python train.py --config experiments/single_dot/config_lambda0.yaml
-
-# structured_dots
-for c in 2_independent 1_coupled_pair 1_dot_1_random combined; do
-  python train.py --config experiments/structured_dots/config_$c.yaml
-done
-
-# sprite_decoder — all encoders first, then all decoders
-for c in none x xy xyt; do python train.py --config experiments/sprite_decoder/config_$c.yaml; done
-for c in none x xy xyt; do python train_decoder.py --config experiments/sprite_decoder/config_decoder_$c.yaml; done
+python toy/train.py --config toy/config/sprite.yaml --smoke
+python toy/train_decoder.py --config toy/config/decoder.yaml --smoke
 ```
+
+Open [`analyze.ipynb`](analyze.ipynb) for loss curves, embedding geometry, and
+reconstructions. Set `RUN` to the desired output directory name.
+To vary the experiments, edit `training.lambda`, dot `dataset.groups`, or sprite
+`dataset.control` (`none`, `x`, `xy`, `xyt`). Training/evaluation splits and the
+encoder, forward/inverse models, and decoder are shared across settings.

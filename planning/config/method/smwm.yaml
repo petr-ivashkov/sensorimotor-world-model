@@ -1,0 +1,8 @@
+# @package _global_
+
+method: smwm
+loss:
+  inverse:
+    weight: 10.0
+  sigreg:
+    weight: 0.0

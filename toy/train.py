@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import yaml
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader
 
 from datasets.structured_dot_world import (
     DotGroup,
@@ -26,7 +26,6 @@ from models import CNNEncoder, ForwardModel, InverseModel
 
 
 REPO_ROOT = Path(__file__).resolve().parent
-CONFIG_DIR = REPO_ROOT / "config"
 
 MOTION_MAP = {
     "independent": MotionType.INDEPENDENT,
@@ -40,19 +39,8 @@ MOTION_MAP = {
 #  Config
 # ─────────────────────────────────────────────────────────────────
 
-def deep_merge(a: dict, b: dict) -> dict:
-    out = dict(a)
-    for k, v in b.items():
-        out[k] = deep_merge(out[k], v) if isinstance(out.get(k), dict) and isinstance(v, dict) else v
-    return out
-
-
 def load_config(path: Path) -> dict:
-    cfg = yaml.safe_load(path.read_text()) or {}
-    merged: dict = {}
-    for ref in cfg.pop("defaults", []):
-        merged = deep_merge(merged, yaml.safe_load((CONFIG_DIR / f"{ref}.yaml").read_text()) or {})
-    return deep_merge(merged, cfg)
+    return yaml.safe_load(path.read_text())
 
 
 def build_structured_config(ds_cfg: dict) -> StructuredDotWorldConfig:
@@ -117,19 +105,29 @@ def build_world(ds_cfg: dict):
 #  Data / model construction
 # ─────────────────────────────────────────────────────────────────
 
-def materialize(ds) -> TensorDataset:
-    """Render a lazy dataset once into stacked tensors."""
-    cols = list(zip(*(ds[i] for i in range(len(ds)))))
-    return TensorDataset(*(torch.stack(c) for c in cols))
+def evaluation_seed(ds_cfg: dict, seed: int) -> int:
+    """Reserve a separate range of per-sample RNG seeds for evaluation."""
+    seed = int(seed)
+    train_size = int(ds_cfg["train_samples"])
+    eval_size = int(ds_cfg["eval_samples"])
+    configured_seed = ds_cfg.get("eval_seed")
+    eval_seed = seed + train_size if configured_seed is None else int(configured_seed)
+    if seed < 0 or eval_seed < 0 or train_size <= 0 or eval_size <= 0:
+        raise ValueError("Dataset seeds must be nonnegative and split sizes positive.")
+    if max(seed, eval_seed) < min(seed + train_size, eval_seed + eval_size):
+        raise ValueError("Training and evaluation per-sample RNG seed ranges overlap.")
+    return eval_seed
 
 
 def build_loaders(ds_cfg, world_cfg, DatasetClass, seed, batch_size):
-    """Train + eval DataLoaders over once-rendered datasets (disjoint seeds)."""
+    """Render deterministic samples on demand, with disjoint train/eval seeds."""
+    eval_seed = evaluation_seed(ds_cfg, seed)
     def loader(num_samples, ds_seed, shuffle):
-        ds = materialize(DatasetClass(world_cfg, num_samples=num_samples, seed=ds_seed))
-        return DataLoader(ds, batch_size=batch_size, shuffle=shuffle)
+        ds = DatasetClass(world_cfg, num_samples=num_samples, seed=ds_seed)
+        return DataLoader(ds, batch_size=batch_size, shuffle=shuffle,
+                          num_workers=int(ds_cfg.get("num_workers", 0)))
     return (loader(int(ds_cfg["train_samples"]), seed, True),
-            loader(int(ds_cfg["eval_samples"]), seed + 999, False))
+            loader(int(ds_cfg["eval_samples"]), eval_seed, False))
 
 
 def build_models(m_cfg, image_size, action_dim, device):
@@ -231,14 +229,20 @@ def save_outputs(run_dir, cfg, models, train_hist, eval_hist, snapshots, last_ev
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train a JEPA-style world model (structured-dot or sprite).")
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--smoke", action="store_true", help="Run a short CPU-sized example.")
     args = parser.parse_args()
 
     config_path = args.config.resolve()
     cfg = load_config(config_path)
+    if args.smoke:
+        cfg["dataset"].update(train_samples=2000, eval_samples=200)
+        cfg["training"].update(epochs=1, eval_every=1)
+        cfg["output"]["run_name"] += "_smoke"
     ds_cfg, m_cfg, t_cfg = cfg["dataset"], cfg["model"], cfg["training"]
     run_name = cfg["output"]["run_name"]
 
     seed, epochs, batch_size = int(t_cfg["seed"]), int(t_cfg["epochs"]), int(t_cfg["batch_size"])
+    ds_cfg["eval_seed"] = evaluation_seed(ds_cfg, seed)
     lr, lam = float(t_cfg["lr"]), float(t_cfg["lambda"])
     eval_every = int(t_cfg.get("eval_every", 10))
 
@@ -250,7 +254,9 @@ def main() -> None:
     action_dim = world_cfg.action_dim
     has_action = action_dim > 0
 
-    run_dir = (config_path.parent / "results" / run_name).resolve()
+    run_dir = REPO_ROOT / "outputs" / run_name
+    if run_dir.exists() and any(run_dir.iterdir()):
+        raise FileExistsError(f"Run already exists: {run_dir}. Change output.run_name.")
     run_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Config       : {config_path}")
@@ -265,7 +271,7 @@ def main() -> None:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-    print("Materializing train + eval datasets ...")
+    print("Preparing train + eval datasets ...")
     train_loader, eval_loader = build_loaders(ds_cfg, world_cfg, DatasetClass, seed, batch_size)
     models = build_models(m_cfg, world_cfg.image_size, action_dim, device)
     opt = optim.Adam([p for m in models for p in m.parameters()], lr=lr)

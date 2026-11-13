@@ -5,14 +5,11 @@ An optional SIGReg term can be enabled explicitly for comparisons.
 """
 
 import os
-import shutil
 from functools import partial
 from pathlib import Path
 
 import hydra
 import lightning as pl
-import lightning.fabric.utilities.registry as lightning_registry
-import lightning.pytorch.trainer.connectors.callback_connector as callback_connector
 import stable_pretraining as spt
 import stable_worldmodel as swm
 import torch
@@ -21,32 +18,15 @@ from omegaconf import OmegaConf, open_dict
 
 from jepa import JEPA
 from module import ARPredictor, Embedder, InverseModel, MLP, SIGReg
-from utils import (
-    ModelObjectCallBack,
-    ResizeCompat,
-    ValidationEmbeddingStatsCallback,
-    get_column_normalizer,
-    save_embeddings,
-)
+from utils import ResizeCompat, get_column_normalizer, disable_external_callbacks
 
 REPO_ROOT = Path(__file__).resolve().parent
 os.environ.setdefault("REPO_ROOT", str(REPO_ROOT))
 
 
 def get_runs_root() -> Path:
-    default_root = Path.cwd() / "results"
+    default_root = REPO_ROOT / "outputs" / "train"
     return Path(os.environ.get("RUNS_ROOT", str(default_root))).expanduser().resolve()
-
-
-def configure_external_callbacks(enabled: bool) -> None:
-    if enabled:
-        return
-
-    def _no_external_callbacks(_group: str):
-        return []
-
-    lightning_registry._load_external_callbacks = _no_external_callbacks
-    callback_connector._load_external_callbacks = _no_external_callbacks
 
 
 def forward_step(self, batch, stage, cfg):
@@ -96,8 +76,12 @@ def forward_step(self, batch, stage, cfg):
     return output
 
 
-@hydra.main(version_base=None, config_path=None, config_name=None)
+@hydra.main(version_base=None, config_path="config", config_name="train")
 def run(cfg):
+    pl.seed_everything(int(cfg.seed), workers=True)
+    run_dir = get_runs_root() / cfg.get("subdir", "")
+    if run_dir.exists() and any(run_dir.iterdir()):
+        raise FileExistsError(f"Run directory already contains files: {run_dir}. Choose another subdir.")
     history_size = int(cfg.wm.get("history_size", 1))
     required_steps = history_size + 1
     with open_dict(cfg):
@@ -208,55 +192,19 @@ def run(cfg):
         module_kwargs["sigreg"] = SIGReg(**cfg.loss.sigreg.kwargs)
 
     module = spt.Module(**module_kwargs)
-    module._log_hyperparams = cfg.get("artifacts", {}).get(
-        "log_lightning_hparams",
-        False,
-    )
-
-    run_id = cfg.get("subdir") or ""
-    run_root = get_runs_root()
-    run_dir = run_root / run_id if run_id else run_root
+    module._log_hyperparams = False
     run_dir.mkdir(parents=True, exist_ok=True)
-
-    if cfg.get("artifacts", {}).get("save_resolved_config", True):
-        with open(run_dir / "config.yaml", "w") as f:
-            OmegaConf.save(cfg, f)
-
-    configure_external_callbacks(cfg.get("artifacts", {}).get("use_external_callbacks", False))
-
-    lightning_dir = run_dir / "lightning" / "local"
-    if lightning_dir.exists():
-        shutil.rmtree(lightning_dir)
-
-    callbacks = []
-    if cfg.get("artifacts", {}).get("save_model_object", False):
-        callbacks.append(
-            ModelObjectCallBack(
-                dirpath=run_dir,
-                filename=cfg.output_model_name,
-                epoch_interval=1,
-            )
-        )
-    if cfg.get("validation_monitoring", {}).get("enabled", False):
-        callbacks.append(
-            ValidationEmbeddingStatsCallback(
-                alpha=float(
-                    cfg.validation_monitoring.get("probe_ridge_alpha", 1.0)
-                )
-            )
-        )
+    OmegaConf.save(cfg, run_dir / "config.yaml")
+    disable_external_callbacks()
 
     csv_logger = CSVLogger(save_dir=str(run_dir), name="lightning", version="local")
     logger = csv_logger
     if cfg.wandb.enabled:
         wandb_logger = WandbLogger(save_dir=str(run_dir), **cfg.wandb.config)
-        if cfg.wandb.get("log_config", False):
-            wandb_logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
         logger = [csv_logger, wandb_logger]
 
     trainer = pl.Trainer(
         **cfg.trainer,
-        callbacks=callbacks,
         num_sanity_val_steps=1,
         default_root_dir=str(run_dir),
         logger=logger,
@@ -272,23 +220,9 @@ def run(cfg):
         data=data_module,
         seed=cfg.seed,
         ckpt_path=ckpt_path,
-        compile=bool(cfg.get("compile", {}).get("enabled", False)),
+        compile=False,
     )
     manager()
-
-    barrier = getattr(manager._trainer.strategy, "barrier", None)
-    if barrier is not None:
-        barrier("save_embeddings_start")
-    if manager._trainer.is_global_zero:
-        save_embeddings(
-            manager.instantiated_module.model,
-            val_set,
-            run_dir / "final_embeddings.pt",
-            batch_size=int(cfg.loader.batch_size),
-            max_items=cfg.get("artifacts", {}).get("embedding_subset_size"),
-        )
-    if barrier is not None:
-        barrier("save_embeddings_end")
 
 
 if __name__ == "__main__":

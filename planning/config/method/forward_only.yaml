@@ -1,0 +1,8 @@
+# @package _global_
+
+method: forward_only
+loss:
+  inverse:
+    weight: 0.0
+  sigreg:
+    weight: 0.0

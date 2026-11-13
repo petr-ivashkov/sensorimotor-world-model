@@ -1,0 +1,122 @@
+defaults:
+- data: tworoom
+- _self_
+- override hydra/job_logging: disabled
+- override hydra/hydra_logging: disabled
+hydra:
+  run:
+    dir: ${oc.env:RUNS_ROOT,${oc.env:REPO_ROOT}/outputs/train}/${subdir}
+  output_subdir: null
+  job:
+    chdir: false
+subdir: ${env}_${method}_seed${seed}
+seed: 0
+img_size: 224
+patch_size: 14
+encoder_scale: tiny
+num_workers: 6
+trainer:
+  max_epochs: 10
+  devices: auto
+  accelerator: gpu
+  precision: bf16
+  gradient_clip_val: 1.0
+loader:
+  batch_size: 256
+  num_workers: ${num_workers}
+  drop_last: true
+  persistent_workers: true
+  prefetch_factor: 3
+  pin_memory: true
+  shuffle: true
+optimizer:
+  type: AdamW
+  lr: 0.0001
+  weight_decay: 0.001
+wm:
+  history_size: 1
+  num_preds: 1
+  embed_dim: 192
+  use_proprio: false
+data:
+  dataset:
+    num_steps: 2
+model:
+  _target_: baselines.pldm.vendor.pldm.pldm.PLDM
+  encoder:
+    _target_: stable_pretraining.backbone.utils.vit_hf
+    size: ${encoder_scale}
+    patch_size: ${patch_size}
+    image_size: ${img_size}
+    pretrained: false
+    use_mask_token: false
+  predictor:
+    _target_: baselines.pldm.vendor.pldm.module.Predictor
+    num_frames: ${wm.history_size}
+    input_dim: ${wm.embed_dim}
+    hidden_dim: ${wm.embed_dim}
+    output_dim: ${wm.embed_dim}
+    depth: 6
+    heads: 16
+    mlp_dim: 2048
+    dim_head: 64
+    dropout: 0.1
+    emb_dropout: 0.0
+  action_encoder:
+    _target_: baselines.pldm.vendor.pldm.module.Embedder
+    input_dim: ???
+    emb_dim: ${wm.embed_dim}
+  projector:
+    _target_: baselines.pldm.vendor.pldm.module.MLP
+    input_dim: ${wm.embed_dim}
+    output_dim: ${wm.embed_dim}
+    hidden_dim: 2048
+    norm_fn:
+      _target_: torch.nn.BatchNorm1d
+      _partial_: true
+  pred_proj:
+    _target_: baselines.pldm.vendor.pldm.module.MLP
+    input_dim: ${wm.embed_dim}
+    output_dim: ${wm.embed_dim}
+    hidden_dim: 2048
+    norm_fn:
+      _target_: torch.nn.BatchNorm1d
+      _partial_: true
+idm:
+  _target_: baselines.pldm.vendor.pldm.module.MLP
+  input_dim: ???
+  hidden_dim: 512
+  output_dim: ???
+loss:
+  sigreg:
+    enabled: true
+    weight: 0.0
+  temp_straight:
+    enabled: false
+    weight: 0.1
+  std:
+    enabled: true
+    weight: 18.0
+  std_t:
+    enabled: true
+    weight: 0.7
+  cov:
+    enabled: true
+    weight: 12.0
+  cov_t:
+    enabled: true
+    weight: 0.0
+  temp_align:
+    enabled: true
+    weight: 0.2
+  idm:
+    enabled: true
+    weight: 0.0
+wandb:
+  enabled: false
+  config:
+    project: sensorimotor-world-model
+    name: ${subdir}
+    resume: never
+    log_model: false
+method: pldm

@@ -1,0 +1,9 @@
+defaults:
+  - train/base
+  - data: tworoom
+  - method: smwm
+  - _self_
+  - override hydra/job_logging: disabled
+  - override hydra/hydra_logging: disabled
+
+subdir: ${env}_${method}_seed${seed}

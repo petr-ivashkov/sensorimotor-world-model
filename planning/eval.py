@@ -1,11 +1,10 @@
 """Planning evaluation for latent world model checkpoints.
 
-Loads one or more trained JEPA runs (rebuilt from their saved config.yaml
-and Lightning last.ckpt) and evaluates each with a CEM planner using
+Loads a model from config.yaml and released weights.pt or a training
+checkpoint, and evaluates it with a CEM planner using
 stable_worldmodel's World + CEMSolver + WorldModelPolicy.
 """
 
-import argparse
 import json
 import os
 import sys
@@ -15,6 +14,7 @@ from pathlib import Path
 os.environ.setdefault("MUJOCO_GL", "egl")
 
 import numpy as np
+import hydra
 import torch
 from omegaconf import OmegaConf
 from sklearn import preprocessing
@@ -29,7 +29,6 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from jepa import JEPA
 from module import ARPredictor, Embedder, InverseModel, MLP
-from utils import load_composed_config
 
 
 def build_jepa(cfg):
@@ -76,34 +75,49 @@ def build_jepa(cfg):
 def load_jepa_from_run(run_dir: Path, device: str = "cuda"):
     run_dir = Path(run_dir)
     train_cfg = OmegaConf.load(run_dir / "config.yaml")
-    model = build_jepa(train_cfg)
-    ckpt = torch.load(
-        run_dir / "checkpoints" / "last.ckpt", map_location="cpu", weights_only=False
-    )
-    state = {
-        k[len("model.") :]: v
-        for k, v in ckpt["state_dict"].items()
-        if k.startswith("model.")
-    }
-    missing, unexpected = model.load_state_dict(state, strict=False)
-    if missing or unexpected:
-        print(
-            f"[{run_dir.name}] load_state_dict: missing={len(missing)} "
-            f"unexpected={len(unexpected)}"
+    method = train_cfg.get("method", "smwm")
+    if method == "dino_wm":
+        from baselines.dino_wm.model import build_dino_wm
+
+        model = build_dino_wm(train_cfg, pretrained=False)
+    elif method == "pldm":
+        from baselines.pldm.planning_model import PlanningPLDM
+
+        model = PlanningPLDM(**{
+            name: hydra.utils.instantiate(train_cfg.model[name])
+            for name in ("encoder", "predictor", "action_encoder", "projector", "pred_proj")
+        })
+    else:
+        model = build_jepa(train_cfg)
+    weights = run_dir / "weights.pt"
+    if weights.is_file():
+        state = torch.load(weights, map_location="cpu", weights_only=True)
+    else:
+        ckpt = torch.load(
+            run_dir / "checkpoints" / "last.ckpt", map_location="cpu", weights_only=False
         )
+        state = {
+            k[len("model.") :]: v
+            for k, v in ckpt["state_dict"].items()
+            if k.startswith("model.")
+        }
+    # strict: a mismatch would leave tensors randomly initialised and still plan.
+    model.load_state_dict(state, strict=True)
     model = model.to(device).eval()
     model.requires_grad_(False)
     model.interpolate_pos_encoding = True
     return model, train_cfg
 
 
-def img_transform(img_size: int):
-    return transforms.Compose(
-        [
-            transforms.ToImage(),
-            transforms.Resize(size=img_size),
-        ]
-    )
+def img_transform(img_size: int, method: str = "smwm"):
+    steps = [transforms.ToImage()]
+    if method in {"pldm", "dino_wm"}:
+        steps.extend([
+            transforms.ToDtype(torch.float32, scale=True),
+            transforms.Normalize(**spt.data.dataset_stats.ImageNet),
+        ])
+    steps.append(transforms.Resize(size=img_size))
+    return transforms.Compose(steps)
 
 
 def fit_processors(dataset, keys_to_cache):
@@ -186,25 +200,6 @@ def sample_start_indices(dataset, num_eval, goal_offset_steps, seed):
     return rows[col_name].tolist(), rows["step_idx"].tolist()
 
 
-def collect_results(out_root: Path, preferred_order=None):
-    results_by_name = {}
-    for metrics_path in sorted(out_root.glob("*/metrics.json")):
-        try:
-            result = json.loads(metrics_path.read_text())
-        except json.JSONDecodeError as exc:
-            print(f"Skipping invalid metrics file {metrics_path}: {exc}")
-            continue
-        name = result.get("name", metrics_path.parent.name)
-        results_by_name[name] = result
-
-    preferred_order = preferred_order or []
-    ordered_names = [name for name in preferred_order if name in results_by_name]
-    ordered_names.extend(
-        sorted(name for name in results_by_name if name not in set(ordered_names))
-    )
-    return [results_by_name[name] for name in ordered_names]
-
-
 def evaluate_run(run, cfg, out_dir: Path, dataset, episodes, start_steps):
     policy_name = run.get("policy", "cem")
 
@@ -213,6 +208,17 @@ def evaluate_run(run, cfg, out_dir: Path, dataset, episodes, start_steps):
         "policy": policy_name,
         "seed": cfg["seed"],
         "task_seed": cfg["eval"].get("task_seed", cfg["seed"]),
+        "env": cfg["env"],
+        "environment": cfg["env_label"],
+        "method": "random",
+        "train_seed": None,
+        "repeat": cfg["repeat"],
+        "inverse_weight": None,
+        "sigreg_weight": None,
+        "history": None,
+        "goal_offset": cfg["eval"]["goal_offset_steps"],
+        "eval_budget": cfg["eval"]["eval_budget"],
+        "num_eval": len(episodes),
     }
     if policy_name == "random":
         print(f"\n=== Evaluating {run['name']} with random policy ===")
@@ -222,11 +228,21 @@ def evaluate_run(run, cfg, out_dir: Path, dataset, episodes, start_steps):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"\n=== Loading {run['name']} from {run['run_dir']} ===")
         model, train_cfg = load_jepa_from_run(run["run_dir"], device=device)
+        if train_cfg.get("env", cfg["env"]) != cfg["env"]:
+            raise ValueError("Evaluation environment differs from the checkpoint's training environment.")
+        method = train_cfg.get("method", "smwm")
+        run_result.update(
+            method=method,
+            train_seed=int(train_cfg.seed),
+            history=int(train_cfg.wm.get("history_size", 1)),
+            inverse_weight=train_cfg.get("loss", {}).get("inverse", {}).get("weight"),
+            sigreg_weight=train_cfg.get("loss", {}).get("sigreg", {}).get("weight"),
+        )
         world = build_world(cfg, train_cfg=train_cfg)
         process = fit_processors(dataset, cfg["dataset"]["keys_to_cache"])
         transform = {
-            "pixels": img_transform(cfg["eval"]["img_size"]),
-            "goal": img_transform(cfg["eval"]["img_size"]),
+            "pixels": img_transform(cfg["eval"]["img_size"], method),
+            "goal": img_transform(cfg["eval"]["img_size"], method),
         }
         solver = swm.solver.CEMSolver(model=model, seed=cfg["seed"], **cfg["solver"])
         plan_cfg = swm.PlanConfig(**cfg["plan_config"])
@@ -254,53 +270,42 @@ def evaluate_run(run, cfg, out_dir: Path, dataset, episodes, start_steps):
     )
     elapsed = time.time() - t0
     print(f"[{run['name']}] metrics: {metrics}  ({elapsed:.1f}s)")
-    run_result["metrics"] = metrics
+    run_result["metrics"] = {
+        key: value.tolist() if isinstance(value, np.ndarray) else value
+        for key, value in metrics.items()
+    }
     run_result["elapsed_seconds"] = elapsed
     return run_result
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, help="path to experiment config.yaml")
-    parser.add_argument(
-        "overrides",
-        nargs=argparse.REMAINDER,
-        help="optional OmegaConf dotlist overrides, e.g. world.history_size=3",
-    )
-    args = parser.parse_args()
-
-    config_path = Path(args.config).resolve()
-    cfg_node = load_composed_config(config_path)
-    overrides = [override for override in args.overrides if override != "--"]
-    if overrides:
-        OmegaConf.set_struct(cfg_node, False)
-        cfg_node = OmegaConf.merge(cfg_node, OmegaConf.from_dotlist(overrides))
+@hydra.main(version_base=None, config_path="config", config_name="eval")
+def main(cfg_node):
     cfg = OmegaConf.to_container(cfg_node, resolve=True)
+    if cfg["policy"] == "random":
+        name = f"{cfg['env']}_random_repeat{cfg['repeat']}"
+        run = {"name": name, "policy": "random"}
+        cfg["seed"] += int(cfg["repeat"])
+    elif cfg["policy"] == "cem":
+        if cfg["run_dir"] is None:
+            raise ValueError("Set run_dir to a trained run, or policy=random for the random baseline.")
+        run_dir = Path(cfg["run_dir"]).expanduser().resolve()
+        if not (run_dir / "config.yaml").is_file():
+            raise FileNotFoundError(run_dir / "config.yaml")
+        if not any((run_dir / name).is_file() for name in ("weights.pt", "checkpoints/last.ckpt")):
+            raise FileNotFoundError(f"Expected weights.pt or checkpoints/last.ckpt in {run_dir}")
+        train_cfg = OmegaConf.load(run_dir / "config.yaml")
+        cfg["seed"] += int(train_cfg.seed)
+        run = {"name": train_cfg.get("subdir") or run_dir.name, "run_dir": str(run_dir)}
+    else:
+        raise ValueError(f"Unknown policy: {cfg['policy']}")
 
-    default_runs_root = config_path.parent / "results"
-    out_root = Path(os.environ.get("RUNS_ROOT", str(default_runs_root)))
-    out_root.mkdir(parents=True, exist_ok=True)
-
-    missing = []
-    for run in cfg["runs"]:
-        policy_name = run.get("policy", "cem")
-        if policy_name == "random":
-            continue
-        if policy_name != "cem":
-            raise ValueError(
-                f"Unsupported run policy '{policy_name}' for run '{run['name']}'"
-            )
-        rd = Path(run["run_dir"])
-        if not (rd / "config.yaml").is_file():
-            missing.append(f"  - {run['name']}: missing {rd / 'config.yaml'}")
-        if not (rd / "checkpoints" / "last.ckpt").is_file():
-            missing.append(f"  - {run['name']}: missing {rd / 'checkpoints' / 'last.ckpt'}")
-    if missing:
-        raise FileNotFoundError(
-            "Preflight failed — the following checkpoints/configs are not present "
-            "on this filesystem:\n" + "\n".join(missing)
-        )
-    print(f"Preflight OK — {len(cfg['runs'])} runs resolved.")
+    goal = int(cfg["eval"]["goal_offset_steps"])
+    budget = int(cfg["eval"]["eval_budget"])
+    if cfg["plan_config"]["horizon"] * cfg["plan_config"]["action_block"] > budget:
+        raise ValueError("Planning horizon in primitive steps exceeds the evaluation budget.")
+    run_out = Path(cfg["output_dir"]) / run["name"] / f"goal{goal}_budget{budget}"
+    if run_out.exists() and any(run_out.iterdir()):
+        raise FileExistsError(f"Evaluation output already exists: {run_out}. Choose another output_dir.")
 
     torch.manual_seed(cfg["seed"])
     np.random.seed(cfg["seed"])
@@ -308,6 +313,7 @@ def main():
     dataset = swm.data.HDF5Dataset(
         cfg["eval"]["dataset_name"],
         keys_to_cache=cfg["dataset"]["keys_to_cache"],
+        cache_dir=cfg["data_dir"],
     )
     task_seed = int(cfg["eval"].get("task_seed", cfg["seed"]))
     print(f"Sampling evaluation tasks with seed={task_seed}.")
@@ -318,22 +324,12 @@ def main():
         task_seed,
     )
 
-    for run in cfg["runs"]:
-        run_out = out_root / run["name"]
-        run_out.mkdir(parents=True, exist_ok=True)
-        result = evaluate_run(run, cfg, run_out, dataset, episodes, start_steps)
-        (run_out / "metrics.json").write_text(json.dumps(result, indent=2, default=str))
-
-    summary_path = out_root / "summary.json"
-    all_results = collect_results(
-        out_root, preferred_order=[run["name"] for run in cfg["runs"]]
-    )
-    summary_path.write_text(json.dumps(all_results, indent=2, default=str))
-    print(f"\nWrote summary to {summary_path}")
-
-    print("\n=== Planning eval summary ===")
-    for r in all_results:
-        print(f"  {r['name']}: {r['metrics']}")
+    run_out.mkdir(parents=True, exist_ok=True)
+    result = evaluate_run(run, cfg, run_out, dataset, episodes, start_steps)
+    result["evaluation_config"] = cfg
+    path = run_out / "metrics.json"
+    path.write_text(json.dumps(result, indent=2, default=str))
+    print(f"\nSaved {path}")
 
 
 if __name__ == "__main__":
