@@ -48,10 +48,9 @@ Returned sample (matches train.py's batch contract
   obs_tp1  : (3, H, W) float32      — observation at t+1
   state_t  : (3,) float32           — pose (x, y, θ) at t
 
-Note on normalization: x, y are pixels and θ is radians, so the action vector
-mixes units.  train.py normalizes by a single ``max_displacement`` scalar; for
-this world prefer per-DOF normalization via ``config.action_scale`` when
-training is wired up (out of scope here).
+Position deltas are measured in pixels and angular deltas in radians.
+The training code uses ``config.action_scale`` to normalize each controlled
+coordinate by its own physical range before predicting or recovering actions.
 """
 
 from __future__ import annotations
